@@ -3,6 +3,7 @@ import { ChevronLeft, MessageSquarePlus, Send, X, ImagePlus, User, Trash2, Edit3
 import { MensagemEquipa, Role, Funcionario } from '../types';
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
 import { t } from '../lib/translations';
+import { sanitizeData } from '../lib/utils';
 
 interface Props {
   mensagensEquipa: MensagemEquipa[];
@@ -59,7 +60,7 @@ export function TeamChat({ mensagensEquipa, role, currentFuncionario, funcionari
     };
     if (tipo === 'texto') { novaMsg.texto = msgTexto; setTeamInput(''); }
     if (tipo === 'imagem') { novaMsg.url = conteudoExtra; }
-    await addDoc(collection(db, `artifacts/${appId}/public/data/chat_equipa_${contaNegocio}`), novaMsg);
+    await addDoc(collection(db, `artifacts/${appId}/public/data/chat_equipa_${contaNegocio}`), sanitizeData(novaMsg));
   };
 
   const apagarMensagemEquipa = (id: string) => {

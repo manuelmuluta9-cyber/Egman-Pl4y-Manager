@@ -682,7 +682,7 @@ export function RelatoriosInteligentes({ transacoes, appId, contaNegocio, config
                  </p>
                  <button 
                    onClick={() => {
-                      const url = "https://ais-pre-l2o2lcgxfj57ykpvcxez3q-419044323565.europe-west1.run.app";
+                      const url = "https://egman-play-634970902396.europe-west2.run.app";
                       navigator.clipboard.writeText(url);
                       mostrarAlerta(t('link_copied', idioma), t('link_copied_desc', idioma));
                    }}

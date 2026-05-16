@@ -18,12 +18,13 @@ interface Props {
   contaNegocio: string;
   onBack: () => void;
   mostrarAlerta: (t: string, m: string) => void;
-  registarAuditoria: (acao: string, detalhe: string) => void;
+  mostrarConfirmacao: (titulo: string, mensagem: string, onConfirm: () => void) => void;
+  registarAuditoria: (acao: string, detalhe: string, metadata?: any) => void;
   temaEscuro?: boolean;
   idioma?: string;
 }
 
-export function GestaoStock({ produtos, transacoes, config, contaNegocio, onBack, mostrarAlerta, registarAuditoria, temaEscuro, idioma }: Props) {
+export function GestaoStock({ produtos, transacoes, config, contaNegocio, onBack, mostrarAlerta, mostrarConfirmacao, registarAuditoria, temaEscuro, idioma }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [editando, setEditando] = useState<Partial<Produto> | null>(null);
   const [isNovo, setIsNovo] = useState(false);
@@ -83,13 +84,19 @@ export function GestaoStock({ produtos, transacoes, config, contaNegocio, onBack
   };
 
   const handleDelete = async (id: string, nome: string) => {
-    if (confirm(`${t('delete_product_confirm', config.idioma)} (${nome})`)) {
+    const exec = async () => {
       try {
         await deleteDoc(doc(db, `artifacts/${appId}/public/data/produtos_${contaNegocio}`, id));
         registarAuditoria('GESTÃO_STOCK', `Removeu produto: ${nome}`);
       } catch (err) {
         mostrarAlerta(t('error', config.idioma), t('delete_failed', config.idioma));
       }
+    };
+
+    if (mostrarConfirmacao) {
+      mostrarConfirmacao(t('delete', config.idioma), `${t('delete_product_confirm', config.idioma)} (${nome})`, exec);
+    } else {
+      if (confirm(`${t('delete_product_confirm', config.idioma)} (${nome})`)) exec();
     }
   };
 
@@ -99,6 +106,12 @@ export function GestaoStock({ produtos, transacoes, config, contaNegocio, onBack
       ...p,
       stockAtual: newStock,
       ultimaReposicao: amount > 0 ? new Date().toISOString().split('T')[0] : p.ultimaReposicao
+    });
+    
+    const acao = amount > 0 ? 'REPOSIÇÃO_STOCK' : 'SAÍDA_STOCK';
+    registarAuditoria(acao, `${amount > 0 ? 'Adicionou' : 'Removeu'} ${Math.abs(amount)} ${p.unidadeMedida}(s) de ${p.nome}. Novo stock: ${newStock}`, {
+      produtoId: p.id,
+      quantidadeAfetada: amount
     });
   };
 
@@ -128,14 +141,14 @@ export function GestaoStock({ produtos, transacoes, config, contaNegocio, onBack
 
       {/* Hero Stats */}
       <div className="grid grid-cols-1 gap-2">
-          <div className={`${temaEscuro ? 'bg-gradient-to-br from-emerald-950/40 to-teal-900/10 border-emerald-500/20 shadow-2xl' : 'bg-emerald-50 border-emerald-200 shadow-sm'} border p-4 rounded-[1.5rem] relative overflow-hidden`}>
+          <div className={`${temaEscuro ? 'bg-gradient-to-br from-emerald-950/40 to-teal-900/10 border-emerald-500/20 shadow-2xl' : 'bg-emerald-50 border-emerald-200 shadow-sm'} border p-3 rounded-2xl relative overflow-hidden`}>
             <div className="relative z-10">
-              <div className="flex items-center gap-1.5 mb-1">
-                <h3 className="text-[8px] font-black text-emerald-500/80 uppercase tracking-[0.2em]">{t('stock_estimated', config.idioma)}</h3>
+              <div className="flex items-center gap-1 mb-0.5">
+                <h3 className="text-[7px] font-black text-emerald-500/80 uppercase tracking-widest">{t('stock_estimated', config.idioma)}</h3>
               </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className={`text-2xl font-black ${temaEscuro ? 'text-white' : 'text-emerald-900'} tracking-tighter`}>{formatarDinheiro(valorTotalStock, config.moeda).replace(config.moeda || 'AKZ', '')}</span>
-                <span className="text-[10px] font-black text-emerald-500/60 uppercase">{config.moeda || 'AKZ'}</span>
+              <div className="flex items-baseline gap-1">
+                <span className={`text-xl font-black ${temaEscuro ? 'text-white' : 'text-emerald-900'} tracking-tighter`}>{formatarDinheiro(valorTotalStock, config.moeda).replace(config.moeda || 'AKZ', '')}</span>
+                <span className="text-[8px] font-black text-emerald-500/60 uppercase">{config.moeda || 'AKZ'}</span>
               </div>
             </div>
           </div>
@@ -152,13 +165,13 @@ export function GestaoStock({ produtos, transacoes, config, contaNegocio, onBack
       </div>
 
       <div className="relative group">
-        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${temaEscuro ? 'text-gray-700' : 'text-gray-400'}`} size={16} />
+        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${temaEscuro ? 'text-gray-700' : 'text-gray-400'}`} size={14} />
         <input 
           type="text" 
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
           placeholder={t('search_placeholder', config.idioma)}
-          className={`w-full ${temaEscuro ? 'bg-gray-950 border-gray-900 text-white' : 'bg-gray-100 border-gray-300 text-gray-900 shadow-inner'} border rounded-xl py-3 pl-10 pr-4 text-[10px] font-black placeholder-gray-800 outline-none transition-all uppercase tracking-widest`}
+          className={`w-full ${temaEscuro ? 'bg-gray-950 border-gray-900 text-white' : 'bg-gray-100 border-gray-300 text-gray-900 shadow-inner'} border rounded-lg py-2 pl-9 pr-4 text-[9px] font-black placeholder-gray-800 outline-none transition-all uppercase tracking-widest`}
         />
       </div>
 
@@ -173,56 +186,56 @@ export function GestaoStock({ produtos, transacoes, config, contaNegocio, onBack
               className={`${temaEscuro ? 'bg-gray-900/50 border-gray-800' : 'bg-white border-gray-200 shadow-sm'} backdrop-blur-md border p-3 rounded-[1.5rem] flex flex-col gap-3 relative overflow-hidden group hover:border-gray-700 transition-all`}
             >
               <div className="flex justify-between items-start">
-                 <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${p.stockAtual <= p.stockMinimo ? 'bg-red-500/10 text-red-500' : (temaEscuro ? 'bg-gray-800 text-gray-500' : 'bg-gray-100 text-gray-400')}`}>
-                      <Box size={18} />
+                 <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${p.stockAtual <= p.stockMinimo ? 'bg-red-500/10 text-red-500' : (temaEscuro ? 'bg-gray-800 text-gray-500' : 'bg-gray-100 text-gray-400')}`}>
+                      <Box size={14} />
                     </div>
                     <div>
-                      <h3 className={`text-[11px] font-black ${temaEscuro ? 'text-white' : 'text-gray-900'} uppercase tracking-tight`}>{p.nome}</h3>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                         <span className="text-[7.5px] text-gray-500 font-black uppercase tracking-widest">{p.categoria}</span>
+                      <h3 className={`text-[10px] font-black ${temaEscuro ? 'text-white' : 'text-gray-900'} uppercase tracking-tight`}>{p.nome}</h3>
+                      <div className="flex items-center gap-1 mt-0.5">
+                         <span className="text-[7px] text-gray-500 font-black uppercase tracking-widest">{p.categoria}</span>
                       </div>
                     </div>
                  </div>
                  <div className="flex gap-1">
-                   <button onClick={() => { setEditando(p); setIsNovo(false); }} className={`p-1.5 ${temaEscuro ? 'bg-gray-900 border-gray-800 text-gray-500 hover:text-white' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-900 shadow-sm'} rounded-lg border shadow-lg`}><Edit3 size={12}/></button>
-                   <button onClick={() => handleDelete(p.id, p.nome)} className="p-1.5 text-red-500/50 hover:text-red-500 bg-red-500/5 rounded-lg border border-red-500/10"><Trash2 size={12}/></button>
+                   <button onClick={() => { setEditando(p); setIsNovo(false); }} className={`p-1 ${temaEscuro ? 'bg-gray-900 border-gray-800 text-gray-500 hover:text-white' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-900 shadow-sm'} rounded-md border shadow-sm`}><Edit3 size={10}/></button>
+                   <button onClick={() => handleDelete(p.id, p.nome)} className="p-1 text-red-500/50 hover:text-red-500 bg-red-500/5 rounded-md border border-red-500/10"><Trash2 size={10}/></button>
                  </div>
                </div>
-               <div className="grid grid-cols-3 gap-2">
-                 <div className={`${temaEscuro ? 'bg-gray-950/80 border-gray-800/50' : 'bg-emerald-50 border-emerald-100'} p-2 rounded-xl border flex flex-col justify-center`}>
-                    <span className="text-[7px] text-gray-600 font-black uppercase tracking-[0.2em] mb-0.5">{t('price_with_currency', config.idioma)}</span>
-                    <span className="text-[11px] font-black text-emerald-500 tracking-tighter">{formatarDinheiro(p.precoVenda, config.moeda)}</span>
+               <div className="grid grid-cols-3 gap-1.5">
+                 <div className={`${temaEscuro ? 'bg-gray-950/80 border-gray-800/50' : 'bg-emerald-50 border-emerald-100'} p-1.5 rounded-lg border flex flex-col justify-center`}>
+                    <span className="text-[6px] text-gray-600 font-black uppercase tracking-widest mb-0.5">{t('price_with_currency', config.idioma)}</span>
+                    <span className="text-[10px] font-black text-emerald-500 tracking-tighter">{formatarDinheiro(p.precoVenda, config.moeda)}</span>
                  </div>
-                 <div className={`${temaEscuro ? 'bg-gray-950/80 border-gray-800/50' : 'bg-gray-50 border-gray-200'} p-2 rounded-xl border flex flex-col justify-center relative overflow-hidden`}>
-                    <span className="text-[7px] text-gray-600 font-black uppercase tracking-[0.2em] mb-0.5">{t('stock', config.idioma)}</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-[11px] font-black tracking-tighter ${p.stockAtual <= p.stockMinimo ? 'text-red-500' : (temaEscuro ? 'text-gray-200' : 'text-gray-900')}`}>
-                         {p.stockAtual} <span className="text-[7px] font-black text-gray-600 uppercase tracking-widest">{p.unidadeMedida}</span>
+                 <div className={`${temaEscuro ? 'bg-gray-950/80 border-gray-800/50' : 'bg-gray-50 border-gray-200'} p-1.5 rounded-lg border flex flex-col justify-center relative overflow-hidden`}>
+                    <span className="text-[6px] text-gray-600 font-black uppercase tracking-widest mb-0.5">{t('stock', config.idioma)}</span>
+                    <div className="flex items-center gap-1">
+                      <span className={`text-[10px] font-black tracking-tighter ${p.stockAtual <= p.stockMinimo ? 'text-red-500' : (temaEscuro ? 'text-gray-200' : 'text-gray-900')}`}>
+                         {p.stockAtual} <span className="text-[6px] font-black text-gray-600 uppercase tracking-widest">{p.unidadeMedida}</span>
                       </span>
                     </div>
                  </div>
-                 <div className={`${temaEscuro ? 'bg-gray-950/80 border-gray-800/50' : 'bg-orange-50 border-orange-100'} p-2 rounded-xl border flex flex-col justify-center`}>
-                    <span className="text-[7px] text-gray-600 font-black uppercase tracking-[0.2em] mb-0.5">{t('sold', config.idioma)}</span>
-                    <span className="text-[11px] font-black text-orange-500 tracking-tighter">
-                      {vendasPorProduto[p.nome] || 0} <span className="text-[7px] opacity-60">{t('items_count', config.idioma)}</span>
+                 <div className={`${temaEscuro ? 'bg-gray-950/80 border-gray-800/50' : 'bg-orange-50 border-orange-100'} p-1.5 rounded-lg border flex flex-col justify-center`}>
+                    <span className="text-[6px] text-gray-600 font-black uppercase tracking-widest mb-0.5">{t('sold', config.idioma)}</span>
+                    <span className="text-[10px] font-black text-orange-500 tracking-tighter">
+                      {vendasPorProduto[p.nome] || 0} <span className="text-[6px] opacity-60">{t('items_count', config.idioma)}</span>
                     </span>
                  </div>
               </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5">
                      <button 
                        onClick={() => adjustStock(p, 1)}
-                       className="flex-1 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 py-2 rounded-xl text-emerald-500 flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all active:scale-95"
+                       className="flex-1 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 py-1.5 rounded-lg text-emerald-500 flex items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-widest transition-all active:scale-95"
                      >
-                       <ArrowUpCircle size={12} /> {t('entry', config.idioma)}
+                       <ArrowUpCircle size={10} /> {t('entry', config.idioma)}
                      </button>
                      <button 
                        onClick={() => adjustStock(p, -1)}
                        disabled={p.stockAtual <= 0}
-                       className={`flex-1 py-2 rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 ${p.stockAtual <= 0 ? (temaEscuro ? 'bg-gray-900 text-gray-700 border-gray-850' : 'bg-gray-200 text-gray-400 border-gray-300') + ' cursor-not-allowed' : 'bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-red-500'}`}
+                       className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-widest transition-all active:scale-95 ${p.stockAtual <= 0 ? (temaEscuro ? 'bg-gray-900 text-gray-700 border-gray-850' : 'bg-gray-200 text-gray-400 border-gray-300') + ' cursor-not-allowed' : 'bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-red-500'}`}
                      >
-                       <ArrowDownCircle size={12} /> {t('exit', config.idioma)}
+                       <ArrowDownCircle size={10} /> {t('exit', config.idioma)}
                      </button>
                   </div>
             </motion.div>
@@ -256,67 +269,67 @@ export function GestaoStock({ produtos, transacoes, config, contaNegocio, onBack
                initial={{ scale: 0.95, opacity: 0, y: 20 }}
                animate={{ scale: 1, opacity: 1, y: 0 }}
                exit={{ scale: 0.95, opacity: 0, y: 20 }}
-               className={`${temaEscuro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200 shadow-2xl'} border w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-[0_50px_100px_rgba(0,0,0,0.5)] relative`}
+               className={`${temaEscuro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200 shadow-2xl'} border w-full max-w-sm rounded-3xl overflow-hidden shadow-[0_50px_100px_rgba(0,0,0,0.5)] relative`}
              >
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-600 via-yellow-500 to-orange-600"></div>
                 
-                <div className={`p-6 border-b ${temaEscuro ? 'border-gray-800 bg-gray-950/50 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'} flex justify-between items-center`}>
-                   <div className="flex items-center gap-3">
-                     <div className="p-2 bg-orange-500/10 text-orange-500 rounded-xl"><Plus size={18} /></div>
-                     <h3 className="text-[11px] font-black uppercase tracking-[0.2em]">{isNovo ? t('new_item', config.idioma) : t('edit_props', config.idioma)}</h3>
+                <div className={`p-4 border-b ${temaEscuro ? 'border-gray-800 bg-gray-950/50 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'} flex justify-between items-center`}>
+                   <div className="flex items-center gap-2">
+                     <div className="p-1.5 bg-orange-500/10 text-orange-500 rounded-lg"><Plus size={14} /></div>
+                     <h3 className="text-[10px] font-black uppercase tracking-widest">{isNovo ? t('new_item', config.idioma) : t('edit_props', config.idioma)}</h3>
                    </div>
-                   <button onClick={() => setEditando(null)} className={`p-3 ${temaEscuro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200 shadow-sm'} border rounded-full text-gray-500 hover:text-white transition-all active:scale-90`}><X size={20}/></button>
+                   <button onClick={() => setEditando(null)} className={`p-2 ${temaEscuro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200 shadow-sm'} border rounded-full text-gray-500 hover:text-white transition-all active:scale-90`}><X size={16}/></button>
                 </div>
 
-                <form onSubmit={handleSave} className="p-8 space-y-6 max-h-[75vh] overflow-y-auto scrollbar-hide pb-10">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-                        <Package size={12} /> {t('product_name', config.idioma)}
+                <form onSubmit={handleSave} className="p-5 space-y-4 max-h-[75vh] overflow-y-auto scrollbar-hide pb-8">
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">
+                        <Package size={10} /> {t('product_name', config.idioma)}
                       </label>
                       <input 
                         required
                         value={editando.nome || ''} 
                         onChange={e => setEditando({...editando, nome: e.target.value})}
-                        className={`w-full ${temaEscuro ? 'bg-gray-950 border-gray-900 text-white' : 'bg-gray-100 border-gray-200 text-gray-900 shadow-inner'} border-2 rounded-2xl p-4 text-sm font-black outline-none focus:border-orange-500 transition-all uppercase tracking-tight`}
+                        className={`w-full ${temaEscuro ? 'bg-gray-950 border-gray-900 text-white' : 'bg-gray-100 border-gray-200 text-gray-900 shadow-inner'} border rounded-xl p-3 text-xs font-black outline-none focus:border-orange-500 transition-all uppercase tracking-tight`}
                         placeholder={t('example_product', config.idioma)}
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-                        <Info size={12} /> {t('specs_notes', config.idioma)}
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">
+                        <Info size={10} /> {t('specs_notes', config.idioma)}
                       </label>
                       <textarea 
                         value={editando.descricao || ''} 
                         onChange={e => setEditando({...editando, descricao: e.target.value})}
-                        className={`w-full ${temaEscuro ? 'bg-gray-950 border-gray-900 text-white' : 'bg-gray-100 border-gray-200 text-gray-900 shadow-inner'} border-2 rounded-2xl p-4 text-sm font-black outline-none focus:border-orange-500 min-h-[100px] transition-all resize-none`}
+                        className={`w-full ${temaEscuro ? 'bg-gray-950 border-gray-900 text-white' : 'bg-gray-100 border-gray-200 text-gray-900 shadow-inner'} border rounded-xl p-3 text-xs font-black outline-none focus:border-orange-500 min-h-[60px] transition-all resize-none`}
                         placeholder={t('specs_placeholder', config.idioma)}
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-                          <ShoppingBag size={12} /> {t('price_with_currency', config.idioma)} ({config.moeda || 'AKZ'})
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">
+                          <ShoppingBag size={10} /> {t('price_with_currency', config.idioma)}
                         </label>
                         <input 
                           type="number"
                           required
                           value={editando.precoVenda || ''} 
                           onChange={e => setEditando({...editando, precoVenda: Number(e.target.value)})}
-                          className={`w-full ${temaEscuro ? 'bg-gray-950 border-gray-900 text-emerald-400' : 'bg-gray-100 border-gray-200 text-emerald-600 shadow-inner'} border-2 rounded-2xl p-4 text-lg font-black outline-none focus:border-emerald-500 transition-all tracking-tighter`}
+                          className={`w-full ${temaEscuro ? 'bg-gray-950 border-gray-900 text-emerald-400' : 'bg-gray-100 border-gray-200 text-emerald-600 shadow-inner'} border rounded-xl p-3 text-sm font-black outline-none focus:border-emerald-500 transition-all tracking-tighter`}
                           placeholder="0.00"
                         />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-                          <Tag size={12} /> {t('category', config.idioma)}
+                      <div className="space-y-1.5">
+                        <label className="text-[8px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">
+                          <Tag size={10} /> {t('category', config.idioma)}
                         </label>
                         <select 
                           value={editando.categoria || 'Bebidas'} 
                           onChange={e => setEditando({...editando, categoria: e.target.value})}
-                          className={`w-full ${temaEscuro ? 'bg-gray-950 border-gray-900 text-white' : 'bg-gray-100 border-gray-200 text-gray-900 shadow-sm'} border-2 rounded-2xl p-4 text-xs font-black outline-none focus:border-orange-500 transition-all uppercase tracking-widest cursor-pointer`}
+                          className={`w-full ${temaEscuro ? 'bg-gray-950 border-gray-900 text-white' : 'bg-gray-100 border-gray-200 text-gray-900 shadow-sm'} border rounded-xl p-3 text-[10px] font-black outline-none focus:border-orange-500 transition-all uppercase tracking-widest cursor-pointer`}
                         >
                           <option value="Bebidas">{t('drinks', config.idioma)}</option>
                           <option value="Snacks">{t('snacks', config.idioma)}</option>
@@ -328,43 +341,43 @@ export function GestaoStock({ produtos, transacoes, config, contaNegocio, onBack
                       </div>
                     </div>
 
-                    <div className={`grid grid-cols-3 gap-3 ${temaEscuro ? 'bg-gray-950/30 border-gray-800/30' : 'bg-gray-100 border-gray-200'} p-5 rounded-3xl border`}>
-                      <div className="space-y-2">
-                        <label className="text-[8px] font-black text-gray-700 uppercase tracking-widest block text-center">{t('initial_qty', config.idioma)}</label>
+                    <div className={`grid grid-cols-3 gap-2 ${temaEscuro ? 'bg-gray-950/30 border-gray-800/30' : 'bg-gray-100 border-gray-200'} p-3 rounded-2xl border`}>
+                      <div className="space-y-1">
+                        <label className="text-[6px] font-black text-gray-700 uppercase tracking-widest block text-center">{t('initial_qty', config.idioma)}</label>
                         <input 
                           type="number"
                           value={editando.stockAtual ?? 0} 
                           onChange={e => setEditando({...editando, stockAtual: Number(e.target.value)})}
-                          className={`w-full ${temaEscuro ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-900'} border rounded-xl p-3 text-center text-sm font-black outline-none focus:border-orange-500`}
+                          className={`w-full ${temaEscuro ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-900'} border rounded-lg p-2 text-center text-xs font-black outline-none focus:border-orange-500`}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-[8px] font-black text-gray-700 uppercase tracking-widest block text-center">{t('stock_alert', config.idioma)}</label>
+                      <div className="space-y-1">
+                        <label className="text-[6px] font-black text-gray-700 uppercase tracking-widest block text-center">{t('stock_alert', config.idioma)}</label>
                         <input 
                           type="number"
                           value={editando.stockMinimo ?? 5} 
                           onChange={e => setEditando({...editando, stockMinimo: Number(e.target.value)})}
-                          className={`w-full ${temaEscuro ? 'bg-gray-900 border-gray-800 text-orange-500' : 'bg-white border-gray-200 text-orange-600'} border rounded-xl p-3 text-center text-sm font-black outline-none focus:border-orange-500`}
+                          className={`w-full ${temaEscuro ? 'bg-gray-900 border-gray-800 text-orange-500' : 'bg-white border-gray-200 text-orange-600'} border rounded-lg p-2 text-center text-xs font-black outline-none focus:border-orange-500`}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-[8px] font-black text-gray-700 uppercase tracking-widest block text-center">{t('unit', config.idioma)}</label>
+                      <div className="space-y-1">
+                        <label className="text-[6px] font-black text-gray-700 uppercase tracking-widest block text-center">{t('unit', config.idioma)}</label>
                         <input 
                           value={editando.unidadeMedida || t('unit', config.idioma)} 
                           onChange={e => setEditando({...editando, unidadeMedida: e.target.value})}
-                          className={`w-full ${temaEscuro ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-900'} border rounded-xl p-3 text-center text-[10px] font-black outline-none focus:border-orange-500 uppercase`}
+                          className={`w-full ${temaEscuro ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-900'} border rounded-lg p-2 text-center text-[8px] font-black outline-none focus:border-orange-500 uppercase`}
                           placeholder={t('unit_placeholder', config.idioma)}
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className={`pt-4 sticky bottom-0 ${temaEscuro ? 'bg-gray-900' : 'bg-white'} pb-2`}>
+                  <div className={`pt-2 sticky bottom-0 ${temaEscuro ? 'bg-gray-900' : 'bg-white'} pb-1`}>
                     <button 
                       type="submit" 
-                      className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-5 rounded-3xl shadow-2xl shadow-orange-500/20 transition-all uppercase tracking-[0.3em] text-[11px] flex items-center justify-center gap-3 active:scale-[0.98]"
+                      className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-orange-500/20 transition-all uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-[0.98]"
                     >
-                      <Save size={20} /> {t('finish_reg', config.idioma)}
+                      <Save size={16} /> {t('finish_reg', config.idioma)}
                     </button>
                   </div>
                 </form>

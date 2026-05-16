@@ -1,159 +1,261 @@
 import React, { useState } from 'react';
-import { Lock, Timer, X, Copy, UploadCloud, Send } from 'lucide-react';
+import { LogOut, Crown, AlertCircle, UploadCloud, ChevronRight, X, Clock } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Assinatura, Config } from '../types';
 import { formatarDinheiro, DADOS_PAGAMENTO } from '../lib/utils';
 import { t } from '../lib/translations';
 
 interface Props {
-  razao: 'expirada' | 'suspensa' | 'ok';
-  expiracao: number;
-  pendente: boolean;
-  moeda: string;
-  idioma: string;
-  mensagemAdmin?: string;
-  fazerLogout: () => void;
-  processarComprovativo: (file: File) => Promise<string>;
+  assinatura: Assinatura | null;
+  razao?: 'expirada' | 'suspensa' | 'ok';
+  onSair: () => void;
   onUpload: (base64: string, meses: number, mensagem?: string) => Promise<void>;
+  processarComprovativo: (file: File) => Promise<string>;
+  mostrarAlerta: (titulo: string, mensagem: string) => void;
+  config: Config;
+  idioma: string;
 }
 
-export function TelaAssinaturaExpirada({ razao, expiracao, pendente, moeda, idioma, mensagemAdmin, fazerLogout, processarComprovativo, onUpload }: Props) {
-  const [loading, setLoading] = useState(false);
+export function TelaAssinaturaExpirada({ assinatura, razao, onSair, onUpload, processarComprovativo, mostrarAlerta, config, idioma }: Props) {
+  const [uploading, setUploading] = useState(false);
   const [mesesSelecionados, setMesesSelecionados] = useState(1);
   const [previewImagem, setPreviewImagem] = useState<string | null>(null);
   const [mensagemAdm, setMensagemAdm] = useState("");
-  const dataExpiracao = expiracao ? new Date(expiracao).toLocaleDateString(idioma === 'en' ? 'en-US' : 'pt-AO') : 'Desconhecida';
+  const [metodoPagamento, setMetodoPagamento] = useState<'mcx' | 'usd' | 'usdt' | 'iban' | 'paypal'>('mcx');
+  const [alertaAngolaFechado, setAlertaAngolaFechado] = useState(false);
 
-  const precoMensal = DADOS_PAGAMENTO.obterPrecoMensal(moeda);
-  const isPDF = previewImagem?.startsWith('data:application/pdf');
+  const expiracao = assinatura?.expiracao || Date.now();
+  const currentRazao = razao || assinatura?.razao || 'expirada';
+  const dataFormatada = new Date(expiracao).toLocaleDateString(idioma === 'en' ? 'en-US' : idioma === 'fr' ? 'fr-FR' : idioma === 'es' ? 'es-ES' : 'pt-AO');
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRenovacao = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
-    setLoading(true);
+    setUploading(true);
     try {
       const base64 = await processarComprovativo(file);
       setPreviewImagem(base64);
     } catch (err) {
-      alert(t('upload_error', idioma));
+      mostrarAlerta(t('error', idioma), t('error_processing_file', idioma));
     } finally {
-      setLoading(false);
+      setUploading(false);
       e.target.value = '';
     }
   };
 
   const confirmarEnvio = async () => {
     if (!previewImagem) return;
-    setLoading(true);
+    setUploading(true);
     try {
       await onUpload(previewImagem, mesesSelecionados, mensagemAdm);
       setPreviewImagem(null);
       setMensagemAdm("");
     } catch (err) {
-      alert(t('send_error', idioma));
+      mostrarAlerta(t('error', idioma), t('error_uploading_file', idioma));
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
 
+  const isPDF = previewImagem?.startsWith('data:application/pdf');
+
   return (
-    <div className="min-h-screen bg-gray-950 flex justify-center items-center font-sans text-gray-100 p-4">
-      <div className="w-full max-w-md bg-gray-900 flex flex-col items-center p-8 rounded-3xl shadow-2xl relative overflow-hidden border border-red-500/20">
-        
-        {previewImagem && (
-          <div className="absolute inset-0 z-50 bg-gray-950 flex flex-col animate-in slide-in-from-bottom duration-300 overflow-hidden">
-             <div className="border-b border-gray-800 p-4 flex items-center justify-between shrink-0">
-                <h3 className="text-white font-black uppercase tracking-widest text-[10px]">{t('payment_review', idioma)}</h3>
-                <button onClick={() => setPreviewImagem(null)} disabled={loading} className="text-gray-400 hover:text-white p-2 bg-gray-800 rounded-full"><X size={20}/></button>
-             </div>
-             <div className="flex-1 min-h-0 p-4 flex flex-col gap-4 overflow-y-auto">
-                <div className="bg-black/40 rounded-xl overflow-hidden border border-gray-800 flex items-center justify-center min-h-[200px]">
-                   {isPDF ? (
-                     <iframe src={previewImagem!} className="w-full h-[400px] border-none rounded-lg" title="PDF Preview"></iframe>
-                   ) : (
-                     <img src={previewImagem!} alt="Preview" className="max-w-full max-h-[300px] object-contain" />
-                   )}
-                </div>
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4 font-sans text-gray-100">
+      <div className="w-full max-w-md bg-gray-900 rounded-[2.5rem] shadow-2xl border border-gray-800 overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-8 opacity-5"><Crown size={120} /></div>
 
-                <div className="flex flex-col gap-2">
-                   <label className="text-[10px] text-gray-500 font-black uppercase tracking-widest text-left w-full">{t('additional_info', idioma)}</label>
-                   <textarea 
-                      value={mensagemAdm} 
-                      onChange={e => setMensagemAdm(e.target.value)}
-                      placeholder={t('write_message_to_admin', idioma)}
-                      className="w-full bg-gray-900 border border-gray-800 p-3 rounded-xl text-xs text-white outline-none focus:border-orange-500/50 transition-colors h-24 resize-none"
-                   />
-                </div>
-
-                <div className="bg-orange-500/10 p-3 rounded-xl border border-orange-500/20 text-left">
-                   <p className="text-[9px] text-orange-400 font-bold uppercase mb-1">{t('reports', idioma)}</p>
-                   <p className="text-xs text-white font-black">{mesesSelecionados} {mesesSelecionados === 1 ? t('month_single', idioma) : t('months_plural', idioma)} • <span className="text-orange-500">{formatarDinheiro(precoMensal * mesesSelecionados, moeda)}</span></p>
-                </div>
-
-                {loading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm z-10"><div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div></div>}
-             </div>
-             <div className="bg-gray-950 border-t border-gray-800 p-4 flex gap-3 shrink-0 pb-6">
-                <button onClick={() => setPreviewImagem(null)} disabled={loading} className="flex-1 py-4 rounded-xl font-black text-[10px] uppercase bg-gray-900 text-gray-400 border border-gray-800">{t('cancel', idioma)}</button>
-                <button onClick={confirmarEnvio} disabled={loading} className="flex-1 py-4 rounded-xl font-black text-[10px] uppercase bg-orange-600 text-white flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">{loading ? t('analyzing_data', idioma).toUpperCase() : t('confirm_access', idioma).toUpperCase()}</button>
-             </div>
+        <div className="p-8 pb-4 relative z-10">
+          <div className="bg-red-500/10 w-16 h-16 rounded-3xl flex items-center justify-center mb-6 border border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
+            <AlertCircle className="text-red-500" size={32} />
           </div>
-        )}
 
-        {pendente ? (
-           <div className="flex flex-col items-center text-center">
-             <div className="bg-orange-500/20 p-5 rounded-full mb-6 mt-4 relative"><Timer size={48} className="text-orange-500" /></div>
-             <h1 className="text-xl font-black tracking-widest text-white mb-2 uppercase">{t('pending_renewal', idioma)}</h1>
-             <p className="text-gray-400 text-xs mb-8 px-4">{t('validating_payment', idioma)}</p>
-             <button onClick={fazerLogout} className="w-full py-4 rounded-2xl font-bold text-xs bg-gray-800 text-gray-400">{t('exit_account', idioma)}</button>
-           </div>
-        ) : (
-           <div className="flex flex-col items-center text-center w-full">
-             <div className="bg-red-500/20 p-4 rounded-full mb-4 mt-2"><Lock size={32} className="text-red-500" /></div>
-             <h1 className="text-2xl font-black tracking-widest text-white mb-2 uppercase">{t('access', idioma)} <span className="text-red-500 text-md">{t('locked_access', idioma).split(' ')[1]}</span></h1>
-             
-             {mensagemAdmin && (
-               <div className="bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-2xl mb-4 w-full">
-                 <p className="text-[9px] text-indigo-400 font-black uppercase tracking-[0.2em] mb-1 text-center">{t('support_notices', idioma)}</p>
-                 <p className="text-xs text-white italic text-center">"{mensagemAdmin}"</p>
-               </div>
-             )}
+          <h2 className="text-2xl font-black text-white uppercase tracking-tight mb-2 leading-tight">
+            {currentRazao === 'suspensa' ? t('account_suspended', idioma) : t('expired_access', idioma)}
+          </h2>
+          <p className="text-xs text-gray-400 mb-8 leading-relaxed uppercase font-bold tracking-widest opacity-80 decoration-red-500/50">
+            {t('validity', idioma)}: <span className="text-red-500 font-black">{dataFormatada}</span>
+          </p>
 
-             {razao === 'suspensa' ? <p className="text-gray-400 text-xs mb-6 px-4">{t('account_blocked_by_admin', idioma)}</p> : <p className="text-gray-400 text-xs mb-6 px-4">{t('session_ended', idioma)} {t('at', idioma)} <strong className="text-white">{dataExpiracao}</strong>.</p>}
+          <div className="bg-orange-500/5 border border-orange-500/10 p-5 rounded-3xl mb-8">
+            <h3 className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Crown size={14} /> {t('renew_license', idioma)}
+            </h3>
 
-             <div className="w-full bg-gray-800 border border-gray-700 p-5 rounded-2xl mb-4 text-left">
-                <div className="flex justify-between items-center mb-3">
-                   <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t('time', idioma)}</span>
-                   <div className="flex items-center gap-2 bg-gray-950 p-1 rounded-lg border border-gray-700">
-                      <button onClick={() => setMesesSelecionados(p => Math.max(1, p-1))} className="w-6 h-6 flex items-center justify-center bg-gray-800 text-white rounded font-bold">-</button>
-                      <span className="text-xs font-black text-white w-12 text-center">{mesesSelecionados} {mesesSelecionados === 1 ? t('month_single', idioma) : t('months_plural', idioma)}</span>
-                      <button onClick={() => setMesesSelecionados(p => p+1)} className="w-6 h-6 flex items-center justify-center bg-gray-800 text-white rounded font-bold">+</button>
-                   </div>
+            {previewImagem ? (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col gap-4">
+                <div className="bg-black/40 rounded-2xl overflow-hidden border border-gray-800 flex items-center justify-center min-h-[180px] relative group">
+                  {isPDF ? (
+                    <iframe src={previewImagem!} className="w-full h-[250px] border-none" title="PDF Preview"></iframe>
+                  ) : (
+                    <img src={previewImagem!} alt="Preview" className="max-w-full max-h-[250px] object-contain shadow-2xl transition-transform group-hover:scale-105" />
+                  )}
+                  <button onClick={() => setPreviewImagem(null)} className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full shadow-lg active:scale-90 transition-all"><X size={16} /></button>
                 </div>
-                <div className="flex justify-between items-center mb-4 bg-orange-500/10 p-2 rounded-lg border border-orange-500/20"><span className="text-[10px] text-orange-400 font-bold uppercase">Total:</span><span className="text-lg text-white font-black">{formatarDinheiro(precoMensal * mesesSelecionados, moeda)}</span></div>
 
-                <p className="text-xs text-gray-400 mb-3">1. {t('choose_another', idioma)} {t('payment', idioma)}:</p>
-                <div className="flex flex-col gap-2 mb-2">
-                  <div className="flex items-center justify-between bg-gray-950 p-3 rounded-xl border border-gray-800">
-                    <div><p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">Multicaixa Express</p><p className="font-mono text-lg font-black text-emerald-400">{DADOS_PAGAMENTO.telefoneMCX}</p></div>
-                    <button onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.telefoneMCX); alert(t('copied', idioma)); }} className="p-2 bg-gray-800 text-gray-300 rounded-lg flex gap-1 items-center text-[10px] uppercase font-bold"><Copy size={14}/> {t('copy', idioma)}</button>
+                <div className="bg-orange-500/10 p-4 rounded-2xl border border-orange-500/20 shadow-inner">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[9px] text-orange-400 font-black uppercase tracking-widest">{t('reports', idioma)}</span>
+                    <span className="text-xs font-black text-white">{mesesSelecionados} {mesesSelecionados === 1 ? t('month_single', idioma) : t('months_plural', idioma)}</span>
                   </div>
-                  {DADOS_PAGAMENTO.redotPayUid && (
-                    <div className="flex items-center justify-between bg-gray-950 p-3 rounded-xl border border-red-500/20">
-                      <div><p className="text-[10px] text-red-500 font-bold uppercase tracking-tight">RedotPay (Dólar/USD)</p><p className="font-mono text-sm font-black text-white">UID: {DADOS_PAGAMENTO.redotPayUid}</p></div>
-                      <button onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.redotPayUid); alert(t('copied', idioma)); }} className="p-2 bg-gray-800 text-gray-300 rounded-lg flex gap-1 items-center text-[10px] uppercase font-bold"><Copy size={14}/> {t('copy', idioma)}</button>
+                  <p className="text-lg font-black text-white">{formatarDinheiro(DADOS_PAGAMENTO.obterPrecoMensal(config.moeda) * mesesSelecionados, config.moeda)}</p>
+                </div>
+
+                <button
+                  onClick={confirmarEnvio}
+                  disabled={uploading}
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  {uploading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : t('send_renew', idioma)}
+                </button>
+              </motion.div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <div className="bg-gray-950/40 p-4 rounded-2xl border border-white/5 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">{t('duration', idioma)}</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setMesesSelecionados(p => Math.max(1, p - 1))} className="w-8 h-8 flex items-center justify-center bg-gray-800 border border-gray-700 text-white rounded-lg font-black active:scale-90 transition-active">-</button>
+                      <span className="text-xs font-black text-white w-10 text-center">{mesesSelecionados}</span>
+                      <button onClick={() => setMesesSelecionados(p => p + 1)} className="w-8 h-8 flex items-center justify-center bg-gray-800 border border-gray-700 text-white rounded-lg font-black active:scale-90 transition-active">+</button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-3 border-t border-white/5">
+                    <span className="text-[10px] text-orange-400 font-bold uppercase">{t('total_to_pay', idioma)}:</span>
+                    <span className="text-sm font-black text-white">{formatarDinheiro(DADOS_PAGAMENTO.obterPrecoMensal(config.moeda) * mesesSelecionados, config.moeda)}</span>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
+                  <p className="text-[9px] text-emerald-400 font-black uppercase tracking-widest leading-tight">
+                    {t('immediate_activation', idioma)}
+                  </p>
+                </div>
+
+                <div className="flex gap-1.5 mb-2 overflow-x-auto pb-1 no-scrollbar">
+                  <button 
+                    onClick={() => { setMetodoPagamento('mcx'); setAlertaAngolaFechado(false); }}
+                    className={`shrink-0 px-4 py-3 rounded-xl border text-[9px] font-black uppercase transition-all ${metodoPagamento === 'mcx' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-500'}`}
+                  >
+                    {t('multicaixa_express', idioma)}
+                  </button>
+                  <button 
+                    onClick={() => { setMetodoPagamento('iban'); setAlertaAngolaFechado(false); }}
+                    className={`shrink-0 px-4 py-3 rounded-xl border text-[9px] font-black uppercase transition-all ${metodoPagamento === 'iban' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-500'}`}
+                  >
+                    {t('bank_transfer', idioma)}
+                  </button>
+                  <button 
+                    onClick={() => setMetodoPagamento('usdt')}
+                    className={`shrink-0 px-4 py-3 rounded-xl border text-[9px] font-black uppercase transition-all ${metodoPagamento === 'usdt' ? 'bg-orange-600 border-orange-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-500'}`}
+                  >
+                    USDT / USD
+                  </button>
+                  <button 
+                    onClick={() => setMetodoPagamento('paypal')}
+                    className={`shrink-0 px-4 py-3 rounded-xl border text-[9px] font-black uppercase transition-all ${metodoPagamento === 'paypal' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-500'}`}
+                  >
+                    PayPal
+                  </button>
+                </div>
+
+                {(metodoPagamento === 'mcx' || metodoPagamento === 'iban') && !alertaAngolaFechado && (
+                  <div className="mb-4 bg-red-600 p-3 rounded-xl flex items-center justify-between gap-2 animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.4)] border border-red-500">
+                    <div className="flex items-center gap-2">
+                        <AlertCircle size={18} className="text-white shrink-0" />
+                        <p className="text-[10px] text-white font-black uppercase tracking-widest leading-tight">
+                          {t('only_angola', idioma)}
+                        </p>
+                    </div>
+                    <button 
+                      onClick={() => setAlertaAngolaFechado(true)}
+                      className="p-1 hover:bg-white/20 rounded-full transition-colors"
+                    >
+                      <X size={14} className="text-white" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3">
+                  {metodoPagamento === 'mcx' ? (
+                    <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800 shadow-inner group relative overflow-hidden transition-all">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/40 via-transparent to-transparent"></div>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">{t('multicaixa_express', idioma)} (AO)</p>
+                      <div className="flex items-center justify-between">
+                        <p className="font-mono text-xl font-black text-white">{DADOS_PAGAMENTO.telefoneMCX}</p>
+                        <button onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.telefoneMCX); alert(t('copied', idioma)); }} className="p-2.5 text-[10px] font-black text-emerald-400 bg-emerald-500/10 rounded-xl hover:bg-emerald-500/20 transition-all uppercase tracking-tight border border-emerald-500/20">{t('copy', idioma)}</button>
+                      </div>
+                    </div>
+                  ) : metodoPagamento === 'iban' ? (
+                    <div className="bg-gray-950 p-4 rounded-2xl border border-blue-500/20 shadow-inner group relative overflow-hidden space-y-3">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500/40 via-transparent to-transparent"></div>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{t('bank_transfer', idioma)}</p>
+                      
+                      <div>
+                        <p className="text-[8px] text-gray-600 font-black uppercase mb-0.5">{t('titular', idioma)}</p>
+                        <p className="text-xs font-black text-white uppercase">{DADOS_PAGAMENTO.titular}</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between bg-gray-900/50 p-2 rounded-xl border border-gray-800">
+                          <div className="flex flex-col">
+                            <span className="text-[7px] text-blue-400 font-black uppercase">BFA</span>
+                            <span className="font-mono text-[10px] font-black text-white">{DADOS_PAGAMENTO.bfa!}</span>
+                          </div>
+                          <button onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.bfa!); alert(t('copied', idioma)); }} className="p-2 text-[8px] font-black text-blue-400 bg-blue-500/10 rounded-lg uppercase">{t('copy', idioma)}</button>
+                        </div>
+                        <div className="flex items-center justify-between bg-gray-900/50 p-2 rounded-xl border border-gray-800">
+                          <div className="flex flex-col">
+                            <span className="text-[7px] text-blue-400 font-black uppercase">ATLÂNTICO</span>
+                            <span className="font-mono text-[10px] font-black text-white">{DADOS_PAGAMENTO.atlantico!}</span>
+                          </div>
+                          <button onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.atlantico!); alert(t('copied', idioma)); }} className="p-2 text-[8px] font-black text-blue-400 bg-blue-500/10 rounded-lg uppercase">{t('copy', idioma)}</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : metodoPagamento === 'paypal' ? (
+                    <div className="bg-gray-950 p-4 rounded-2xl border border-blue-500/20 shadow-inner group relative overflow-hidden transition-all">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500/40 via-transparent to-transparent"></div>
+                      <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest mb-1">PayPal</p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[8px] text-gray-600 font-black uppercase mb-0.5">Email / ID</p>
+                          <p className="font-mono text-[10px] font-black text-white break-all">{DADOS_PAGAMENTO.paypalEmail}</p>
+                        </div>
+                        <button onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.paypalEmail!); alert(t('copied', idioma)); }} className="p-2.5 text-[10px] font-black text-blue-400 bg-blue-500/10 rounded-xl hover:bg-blue-500/20 transition-all uppercase tracking-tight border border-blue-500/20 shrink-0 ml-2">{t('copy', idioma)}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-950 p-4 rounded-2xl border border-orange-500/20 shadow-inner group relative overflow-hidden transition-all">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500/40 via-transparent to-transparent"></div>
+                      <p className="text-[10px] text-orange-400 font-bold uppercase tracking-widest mb-1">RedotPay (USDT / USD)</p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[8px] text-gray-600 font-black uppercase mb-0.5">UID Account</p>
+                          <p className="font-mono text-lg font-black text-white">{DADOS_PAGAMENTO.redotPayUid}</p>
+                        </div>
+                        <button onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.redotPayUid!); alert(t('copied', idioma)); }} className="p-2.5 text-[10px] font-black text-orange-400 bg-orange-500/10 rounded-xl hover:bg-orange-500/20 transition-all uppercase tracking-tight border border-orange-500/20">{t('copy', idioma)}</button>
+                      </div>
                     </div>
                   )}
-                </div>
-             </div>
 
-             <div className="w-full text-left mb-6">
-                <p className="text-xs text-orange-400 font-bold mb-2 uppercase tracking-tight">2. {t('upload_receipt_desc', idioma)}</p>
-                <label className={`w-full bg-orange-600 text-white font-black text-sm py-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-600/20 active:scale-95 transition-all ${loading ? 'opacity-50' : ''}`}>
-                   {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <><UploadCloud size={18}/> {t('upload_receipt', idioma).toUpperCase()}</>}
-                   <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileUpload} disabled={loading} />
-               </label>
-                <p className="mt-2 text-[9px] text-gray-500 text-center uppercase font-bold tracking-widest">JPG, PNG {t('or', idioma)} PDF {t('recommended', idioma)}</p>
-             </div>
-             <button onClick={fazerLogout} className="w-full py-4 rounded-2xl font-bold text-xs bg-gray-800 text-gray-400">{t('logout', idioma)}</button>
-           </div>
-        )}
+                  <label className="w-full bg-orange-600 text-white font-black text-sm py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-600/20 active:scale-95 transition-all">
+                    {uploading ? <div className="animate-spin h-5 w-5 border-2 border-white rounded-full border-t-transparent" /> : <><UploadCloud size={18} /> {t('upload_receipt', idioma)}</>}
+                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleRenovacao} disabled={uploading} />
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-8 pt-0 bg-gray-900 border-t border-gray-800 flex gap-4">
+          <button
+            onClick={onSair}
+            className="flex-1 py-4 bg-gray-800 hover:bg-gray-700 text-gray-300 font-black text-[10px] uppercase rounded-2xl border border-gray-700 transition-all flex items-center justify-center gap-2"
+          >
+            <LogOut size={16} /> {t('logout', idioma)}
+          </button>
+        </div>
       </div>
     </div>
   );

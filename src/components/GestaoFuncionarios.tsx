@@ -3,6 +3,7 @@ import { User, Trash2, Key, UserPlus, ShieldOff, ShieldCheck, X, Camera, Save, E
 import { Funcionario } from '../types';
 import { collection, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { t } from '../lib/translations';
+import { sanitizeData } from '../lib/utils';
 
 interface Props {
   funcionarios: Funcionario[];
@@ -44,7 +45,7 @@ export function GestaoFuncionarios({ funcionarios, db, appId, contaNegocio, regi
         ativo: true,
         criadoEm: Date.now()
       };
-      await addDoc(collection(db, `artifacts/${appId}/public/data/funcionarios_${contaNegocio}`), payload);
+      await addDoc(collection(db, `artifacts/${appId}/public/data/funcionarios_${contaNegocio}`), sanitizeData(payload));
       await registarAuditoria('FUNC_CRIAR', `Criou funcionário: ${novoNome}`);
       setNovoNome(''); setNovaSenha(''); setNovaFoto(null); setMostrandoAdd(false);
       mostrarAlerta(t('success', idioma), t('employee_created', idioma));

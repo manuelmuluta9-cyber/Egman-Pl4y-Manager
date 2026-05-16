@@ -134,29 +134,29 @@ export function IntelligenceHub({ transacoes, maquinas, funcionarios, sessoes, c
   const totalDespesas = expensesByCategory.reduce((acc, c) => acc + c[1], 0);
 
   return (
-    <div className="p-4 flex flex-col gap-6 animate-in fade-in pb-24">
+    <div className="p-3 flex flex-col gap-4 animate-in fade-in pb-24">
       {/* Resumo Proativo de Inteligência */}
-      <section className="bg-gradient-to-br from-indigo-900/40 to-blue-900/20 border border-indigo-500/30 p-5 rounded-3xl relative overflow-hidden">
-        <Sparkles className="absolute -right-4 -top-4 text-indigo-500/20" size={120} />
-        <div className="flex items-center gap-3 mb-4">
-          <div className="bg-indigo-500 p-2 rounded-xl shadow-lg shadow-indigo-500/40">
-            <BrainCircuit size={20} className="text-white" />
+      <section className="bg-gradient-to-br from-indigo-900/40 to-blue-900/20 border border-indigo-500/30 p-4 rounded-2xl relative overflow-hidden">
+        <Sparkles className="absolute -right-4 -top-4 text-indigo-500/10" size={80} />
+        <div className="flex items-center gap-2 mb-3">
+          <div className="bg-indigo-500 p-1.5 rounded-lg shadow-lg shadow-indigo-500/40">
+            <BrainCircuit size={16} className="text-white" />
           </div>
-          <h2 className="text-white font-black uppercase tracking-widest text-sm">{t('insights_title', idioma)}</h2>
-          {loadingInsights && <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin ml-auto" />}
+          <h2 className="text-white font-black uppercase tracking-widest text-[10px]">{t('insights_title', idioma)}</h2>
+          {loadingInsights && <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin ml-auto" />}
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {insights.map((msg, i) => (
             <motion.div 
               key={i} 
-              initial={{ opacity: 0, x: -20 }} 
+              initial={{ opacity: 0, x: -10 }} 
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="bg-gray-900/60 backdrop-blur-sm border border-indigo-500/20 px-4 py-2.5 rounded-2xl flex items-center gap-3"
+              className="bg-gray-900/60 backdrop-blur-sm border border-indigo-500/20 px-3 py-1.5 rounded-xl flex items-center gap-2"
             >
-              <Zap size={14} className="text-yellow-400" />
-              <span className="text-xs text-indigo-100 font-medium">{msg}</span>
+              <Zap size={10} className="text-yellow-400" />
+              <span className="text-[10px] text-indigo-100 font-medium">{msg}</span>
             </motion.div>
           ))}
           {insights.length === 0 && !loadingInsights && (
@@ -168,25 +168,21 @@ export function IntelligenceHub({ transacoes, maquinas, funcionarios, sessoes, c
         </div>
       </section>
 
-      {/* Grid de Métricas Avançadas */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <section className="grid grid-cols-1 gap-2">
         {/* Machine Performance */}
-        <div className="bg-gray-900/40 border border-gray-800 p-5 rounded-3xl group relative">
-           <div className="flex items-center gap-2 mb-4">
-              <Monitor size={18} className="text-indigo-500" />
-              <h3 className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">{t('machine_performance', idioma)}</h3>
-              <div className="group-hover:opacity-100 opacity-0 transition-opacity absolute top-4 right-4 bg-indigo-600 text-[8px] text-white p-2 rounded-lg z-20 w-32 font-bold leading-tight pointer-events-none">
-                {t('machine_performance_desc', idioma)}
-              </div>
+        <div className="bg-gray-900/40 border border-gray-800 p-4 rounded-2xl group relative">
+           <div className="flex items-center gap-2 mb-3">
+              <Monitor size={14} className="text-indigo-500" />
+              <h3 className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">{t('machine_performance', idioma)}</h3>
            </div>
-           <div className="space-y-3">
+           <div className="space-y-2">
               {machineStats.slice(0, 3).map((m, i) => (
                 <div key={i} className="space-y-1">
-                   <div className="flex justify-between text-[11px] font-bold text-gray-300">
+                   <div className="flex justify-between text-[10px] font-bold text-gray-300">
                       <span>{m.nome}</span>
                       <span>{formatarDinheiro(m.total, config.moeda)}</span>
                    </div>
-                   <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                   <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-indigo-500" 
                         style={{ width: `${(m.total / (maquinaLider?.total || 1)) * 100}%` }}
@@ -194,27 +190,24 @@ export function IntelligenceHub({ transacoes, maquinas, funcionarios, sessoes, c
                    </div>
                 </div>
               ))}
-              {machineStats.length === 0 && <p className="text-[10px] text-gray-600 text-center py-4 uppercase font-black">{t('no_machine_data', idioma)}</p>}
+              {machineStats.length === 0 && <p className="text-[9px] text-gray-600 text-center py-2 uppercase font-black">{t('no_machine_data', idioma)}</p>}
            </div>
         </div>
 
         {/* Staff Performance */}
-        <div className="bg-gray-900/40 border border-gray-800 p-5 rounded-3xl group relative">
-           <div className="flex items-center gap-2 mb-4">
-              <Users size={18} className="text-emerald-500" />
-              <h3 className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">{t('staff_performance', idioma)}</h3>
-              <div className="group-hover:opacity-100 opacity-0 transition-opacity absolute top-4 right-4 bg-emerald-600 text-[8px] text-white p-2 rounded-lg z-20 w-32 font-bold leading-tight pointer-events-none">
-                {t('staff_productivity_desc', idioma)}
-              </div>
+        <div className="bg-gray-900/40 border border-gray-800 p-4 rounded-2xl group relative">
+           <div className="flex items-center gap-2 mb-3">
+              <Users size={14} className="text-emerald-500" />
+              <h3 className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">{t('staff_performance', idioma)}</h3>
            </div>
-           <div className="space-y-3">
+           <div className="space-y-2">
               {staffStats.slice(0, 3).map((s, i) => (
                 <div key={i} className="space-y-1">
-                   <div className="flex justify-between text-[11px] font-bold text-gray-300">
+                   <div className="flex justify-between text-[10px] font-bold text-gray-300">
                       <span>{s.nome}</span>
                       <span>{formatarDinheiro(s.total, config.moeda)}</span>
                    </div>
-                   <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                   <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-emerald-500" 
                         style={{ width: `${(s.total / (funcionarioLider?.total || 1)) * 100}%` }}
@@ -222,40 +215,39 @@ export function IntelligenceHub({ transacoes, maquinas, funcionarios, sessoes, c
                    </div>
                 </div>
               ))}
-              {staffStats.length === 0 && <p className="text-[10px] text-gray-600 text-center py-4 uppercase font-black">{t('no_staff_data', idioma)}</p>}
+              {staffStats.length === 0 && <p className="text-[9px] text-gray-600 text-center py-2 uppercase font-black">{t('no_staff_data', idioma)}</p>}
            </div>
         </div>
       </section>
 
       {/* Predictions Section */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-gray-900/40 border border-gray-800 p-5 rounded-3xl">
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart3 size={18} className="text-orange-500" />
-            <h3 className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">{t('monthly_forecast', idioma)}</h3>
+      <section className="grid grid-cols-2 gap-2">
+        <div className="bg-gray-900/40 border border-gray-800 p-3 rounded-2xl">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <BarChart3 size={14} className="text-orange-500" />
+            <h3 className="text-gray-400 font-bold uppercase text-[8px] tracking-widest">{t('monthly_forecast', idioma)}</h3>
           </div>
-          <div className="flex items-end gap-3">
-             <span className="text-3xl font-black text-white">{formatarDinheiro(trends.estimativaMensal, config.moeda)}</span>
-             <div className={`flex items-center text-[10px] font-black pb-1 ${trends.crescimento >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                {trends.crescimento >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                {Math.abs(trends.crescimento).toFixed(1)}% {t('vs_previous_month', idioma)}
+          <div className="flex flex-col">
+             <span className="text-lg font-black text-white leading-tight">{formatarDinheiro(trends.estimativaMensal, config.moeda)}</span>
+             <div className={`flex items-center text-[8px] font-black mt-0.5 ${trends.crescimento >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                {trends.crescimento >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                {Math.abs(trends.crescimento).toFixed(1)}%
              </div>
           </div>
-          <p className="text-[10px] text-gray-500 mt-2">{t('monthly_forecast_desc', idioma)}</p>
         </div>
 
-        <div className="bg-gray-900/40 border border-gray-800 p-5 rounded-3xl">
-          <div className="flex items-center gap-2 mb-3">
-            <ShieldCheck size={18} className="text-blue-500" />
-            <h3 className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">{t('financial_stability', idioma)}</h3>
+        <div className="bg-gray-900/40 border border-gray-800 p-3 rounded-2xl">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <ShieldCheck size={14} className="text-blue-500" />
+            <h3 className="text-gray-400 font-bold uppercase text-[8px] tracking-widest leading-none">{t('stability', idioma) || 'Estabilidade'}</h3>
           </div>
-          <div className="space-y-2">
-            <p className="text-sm text-gray-200 font-medium">
+          <div className="space-y-1">
+            <p className="text-[9px] text-gray-200 font-bold truncate">
                {trends.crescimento > 10 ? t('excellent_health', idioma) :
                 trends.crescimento > 0 ? t('healthy_flow', idioma) :
                 t('attention_flow', idioma)}
             </p>
-            <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+            <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden">
                <div 
                  className={`h-full transition-all duration-1000 ${trends.crescimento >= 0 ? 'bg-indigo-500' : 'bg-red-500'}`} 
                  style={{ width: `${Math.max(10, Math.min(100, 50 + trends.crescimento))}%` }} 
@@ -266,29 +258,27 @@ export function IntelligenceHub({ transacoes, maquinas, funcionarios, sessoes, c
       </section>
 
       {/* Analítica de Custos por Categoria */}
-      <section className="bg-gray-900/40 border border-gray-800 p-5 rounded-3xl relative overflow-hidden">
-        <div className="flex items-center justify-between mb-6">
+      <section className="bg-gray-900/40 border border-gray-800 p-4 rounded-2xl relative overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
            <div className="flex items-center gap-2">
-             <BarChart3 size={18} className="text-red-500" />
-             <h3 className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">{t('cost_structure', idioma)}</h3>
+             <BarChart3 size={14} className="text-red-500" />
+             <h3 className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">{t('cost_structure', idioma)}</h3>
            </div>
            <div className="text-right">
-              <span className="block text-[8px] text-gray-500 font-bold uppercase tracking-widest">{t('total_spent', idioma)}</span>
-              <span className="text-sm font-black text-white">{formatarDinheiro(totalDespesas, config.moeda)}</span>
+              <span className="text-[10px] font-black text-white">{formatarDinheiro(totalDespesas, config.moeda)}</span>
            </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {expensesByCategory.map(([cat, val]) => (
-            <div key={cat} className="space-y-1.5">
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-gray-300 font-bold uppercase tracking-tighter">{cat}</span>
+            <div key={cat} className="space-y-1">
+              <div className="flex justify-between items-center text-[9px]">
+                <span className="text-gray-300 font-bold uppercase tracking-tight">{cat}</span>
                 <span className="text-gray-400 font-black">
                   {formatarDinheiro(val, config.moeda)} 
-                  <span className="text-[9px] text-gray-600 ml-1">({((val / (totalDespesas || 1)) * 100).toFixed(0)}%)</span>
                 </span>
               </div>
-              <div className="h-2 w-full bg-gray-800/50 rounded-full overflow-hidden">
+              <div className="h-1 w-full bg-gray-800/50 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${(val / (totalDespesas || 1)) * 100}%` }}
@@ -298,12 +288,6 @@ export function IntelligenceHub({ transacoes, maquinas, funcionarios, sessoes, c
               </div>
             </div>
           ))}
-          {expensesByCategory.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 opacity-30">
-               <BarChart3 size={40} className="text-gray-600" />
-               <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">{t('no_expense', idioma)}</p>
-            </div>
-          )}
         </div>
       </section>
 

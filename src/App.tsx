@@ -6,11 +6,12 @@ import {
   PlusCircle, Info, ChevronRight, MessageCircle, Play, Pause, Square, 
   Trash2, Timer, Clock, Edit3, ImagePlus, User, Landmark, Banknote, 
   CreditCard, UserCog, History, ChevronLeft, Download, Crown, Key, Mail,
-  Send, BrainCircuit, Package, Sun, Moon
+  Send, BrainCircuit, Package, Sun, Moon, Facebook, MessageSquare
 } from 'lucide-react';
 import { onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { 
-  onSnapshot, doc, collection, setDoc, deleteDoc, addDoc, updateDoc, getDoc 
+  onSnapshot, doc, collection, setDoc, deleteDoc, addDoc, updateDoc, getDoc,
+  query, orderBy, limit 
 } from 'firebase/firestore';
 import { NotificationCenter, AppNotification, NotificationType } from './components/NotificationCenter';
 
@@ -20,7 +21,7 @@ import {
 } from './types';
 import { 
   obterDataHoje, obterHoraAtual, obterDataHoraCompleta, formatarDinheiro, 
-  processarComprovativo, DADOS_PAGAMENTO 
+  processarComprovativo, DADOS_PAGAMENTO, sanitizeData
 } from './lib/utils';
 
 // Components
@@ -143,7 +144,7 @@ export default function App() {
   const notifiedSessions = useRef<Set<string>>(new Set());
   const warningSessions = useRef<Set<string>>(new Set());
 
-  const addNotification = (type: NotificationType, title: string, message: string, priority: 'low' | 'medium' | 'high' = 'medium', targetId?: string) => {
+  const addNotification = (type: NotificationType, title: string, message: string, priority: 'low' | 'medium' | 'high' = 'medium', targetId?: string, syncToCloud = false) => {
     const newNotif: AppNotification = {
       id: Math.random().toString(36).substr(2, 9),
       type,
@@ -154,7 +155,22 @@ export default function App() {
       priority,
       targetId
     };
-    setNotifications(prev => [newNotif, ...prev].slice(0, 50));
+    
+    setNotifications(prev => {
+      // Evitar duplicados se vier do cloud
+      if (prev.some(n => n.title === title && n.message === message && Math.abs(n.timestamp.getTime() - newNotif.timestamp.getTime()) < 1000)) {
+        return prev;
+      }
+      return [newNotif, ...prev].slice(0, 50);
+    });
+
+    if (syncToCloud && contaNegocio) {
+      addDoc(collection(db, `artifacts/${appId}/public/data/alertas_seguranca_${contaNegocio}`), sanitizeData({
+        ...newNotif,
+        timestamp: newNotif.timestamp.toISOString(),
+        autor: role || 'Sistema'
+      }));
+    }
   };
 
   const removeNotification = (id: string) => {
@@ -285,7 +301,7 @@ export default function App() {
         payload.plano = 'Aguardando Aprovação'; payload.dataExpiracao = Date.now() + (1 * 24 * 60 * 60 * 1000); payload.pagamentoPendente = { data: Date.now(), comprovativo: comprovativoBase64, meses: meses, mensagem: mensagem || "" }; 
       }
       localStorage.setItem('pm_saved_email', emailLimpo);
-      await setDoc(docRef, payload);
+      await setDoc(docRef, sanitizeData(payload));
       setContaNegocio(emailSafe); setAlertaLogin('');
     }
   };
@@ -342,11 +358,14 @@ export default function App() {
           if (!notifiedStock.current.has(p.id)) {
             notifiedStock.current.add(p.id);
             const type = p.stockAtual === 0 ? 'high' : 'medium';
-            const msg = p.stockAtual === 0 ? `ACABOU: ${p.nome}` : `Stock Baixo: ${p.nome}`;
+            const msg = p.stockAtual === 0 
+              ? `${t('stock_alert_out', config.idioma)}: ${p.nome}` 
+              : `${t('stock_alert_low', config.idioma)}: ${p.nome}`;
+            
             addNotification(
               'info', 
               msg, 
-              `Restam apenas ${p.stockAtual} ${p.unidadeMedida}(s).`, 
+              `${t('stock_left_msg', config.idioma)} ${p.stockAtual} ${p.unidadeMedida}(s).`, 
               type as any
             );
           }
@@ -399,13 +418,58 @@ export default function App() {
       }
       setLoadingDados(false);
     });
+
+    // 9. Admin Security Notifications Listener
+    let unsubAlertas = () => {};
+    if (role === 'admin') {
+      unsubAlertas = onSnapshot(query(collection(db, DB_PATH, `alertas_seguranca_${contaNegocio}`), orderBy('timestamp', 'desc'), limit(20)), (snap) => {
+        snap.docChanges().forEach(change => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            const notif: AppNotification = {
+              id: change.doc.id,
+              type: data.type,
+              title: data.title,
+              message: data.message,
+              timestamp: new Date(data.timestamp),
+              isRead: data.isRead,
+              priority: data.priority,
+              targetId: data.targetId
+            };
+            
+            setNotifications(prev => {
+              if (prev.some(n => n.id === notif.id)) return prev;
+              return [notif, ...prev].slice(0, 50);
+            });
+          }
+        });
+      });
+    }
     
-    return () => { unsubTransacoes(); unsubSessoes(); unsubMaquinas(); unsubAuditoria(); unsubProdutos(); unsubChatEquipa(); unsubFuncionarios(); unsubConfig(); };
+    return () => { 
+      unsubTransacoes(); unsubSessoes(); unsubMaquinas(); unsubAuditoria(); 
+      unsubProdutos(); unsubChatEquipa(); unsubFuncionarios(); unsubConfig(); 
+      unsubAlertas();
+    };
   }, [firebaseUser, contaNegocio, assinatura?.ativa]);
 
-  const registarAuditoria = async (acao: string, detalhe: string) => {
+  const registarAuditoria = async (acao: string, detalhe: string, metadata?: any) => {
     if (!contaNegocio) return;
-    await addDoc(collection(db, `artifacts/${appId}/public/data/auditoria_${contaNegocio}`), { acao, detalhe, autor: role || 'Sistema', dataHora: obterDataHoraCompleta(), data: obterDataHoje(), hora: obterHoraAtual() });
+    await addDoc(collection(db, `artifacts/${appId}/public/data/auditoria_${contaNegocio}`), sanitizeData({ 
+      acao, 
+      detalhe, 
+      autor: role || 'Sistema', 
+      dataHora: obterDataHoraCompleta(), 
+      data: obterDataHoje(), 
+      hora: obterHoraAtual(),
+      metadata: metadata || null
+    }));
+    
+    // Se for uma ação de funcionário que não seja transação normal, notificar admin via cloud
+    const acoesNotificaveis = ['EDITAR_TRANSACAO', 'APAGAR_TRANSACAO', 'MÁQUINA_ADC', 'MÁQUINA_DEL', 'FUNCIONARIO_ADD', 'FUNCIONARIO_DEL', 'SESSAO_INICIO', 'JOGO_RECARGA', 'CONFIG_UPDT', 'STOCK_UPDT'];
+    if (role === 'funcionario' && acoesNotificaveis.includes(acao)) {
+      addNotification('security', acao, `${currentFuncionario?.nome}: ${detalhe}`, 'medium', undefined, true);
+    }
   };
 
   const atualizarConfig = async (novasConfigs: Partial<Config>) => {
@@ -413,19 +477,19 @@ export default function App() {
     if (novasConfigs.idioma) {
       localStorage.setItem('pm_idioma', novasConfigs.idioma);
     }
-    await setDoc(doc(db, `artifacts/${appId}/public/data/settings_${contaNegocio}`, 'geral'), { ...config, ...novasConfigs }, { merge: true });
+    await setDoc(doc(db, `artifacts/${appId}/public/data/settings_${contaNegocio}`, 'geral'), sanitizeData({ ...config, ...novasConfigs }), { merge: true });
   };
 
   const handleAIAction = async (call: any) => {
     const { name, args } = call;
     try {
       if (name === 'registarTransacao') {
-        const nova = { ...args, data: new Date().toISOString() };
+        const nova = sanitizeData({ ...args, data: new Date().toISOString() });
         await addDoc(collection(db, `artifacts/${appId}/public/data/transacoes_${contaNegocio}`), nova);
         await registarAuditoria('IA_ACAO', `Registou: ${args.descricao}`);
         mostrarAlerta("EGMAN AI", `${t('action_executed', config.idioma)}: ${args.descricao} (${formatarDinheiro(args.valor)})`);
       } else if (name === 'alterarConfiguracao') {
-        await setDoc(doc(db, `artifacts/${appId}/public/data/settings_${contaNegocio}`, 'geral'), args, { merge: true });
+        await setDoc(doc(db, `artifacts/${appId}/public/data/settings_${contaNegocio}`, 'geral'), sanitizeData(args), { merge: true });
         await registarAuditoria('IA_ACAO', "Alterou configurações.");
         mostrarAlerta("EGMAN AI", t('settings_updated', config.idioma));
       } else if (name === 'bloquearFuncionario') {
@@ -446,16 +510,19 @@ export default function App() {
         if (f.senha === senha) {
           if (!f.ativo) {
             mostrarAlerta(t('access_denied', config.idioma), t('account_blocked_by_admin', config.idioma));
-            addNotification('security', t('blocked_access', config.idioma), `${t('inactive_employee_login_attempt', config.idioma)}: ${f.nome}`, 'high');
+            addNotification('security', t('blocked_access', config.idioma), `${t('inactive_employee_login_attempt', config.idioma)}: ${f.nome}`, 'high', undefined, true);
+            registarAuditoria('SEGURANÇA', `Tentativa de login em conta bloqueada: ${f.nome}`);
             return;
           }
           setRole('funcionario'); 
           setCurrentFuncionario(f);
           setPinInput("");
-          addNotification('info', t('login_done', config.idioma), `${t('employee_entered', config.idioma)} ${f.nome}.`, 'low');
+          addNotification('info', t('login_done', config.idioma), `${t('employee_entered', config.idioma)} ${f.nome}.`, 'low', undefined, true);
+          registarAuditoria('LOGIN', `Funcionário entrou: ${f.nome}`);
         } else {
           mostrarAlerta(t('error_label', config.idioma), t('incorrect_password', config.idioma));
-          addNotification('security', t('login_failed', config.idioma), `${t('incorrect_pin_attempted_by', config.idioma)} ${f.nome}.`, 'medium');
+          addNotification('security', t('login_failed', config.idioma), `${t('incorrect_pin_attempted_by', config.idioma)} ${f.nome}.`, 'medium', undefined, true);
+          registarAuditoria('SEGURANÇA', `PIN Incorreto para funcionário: ${f.nome}`);
         }
       }
     } 
@@ -465,11 +532,13 @@ export default function App() {
         setCurrentFuncionario(null); 
         setErroPin(false); 
         setPinInput(""); 
-        addNotification('security', t('root_access', config.idioma), t('admin_authenticated_success', config.idioma), 'medium');
+        addNotification('security', t('root_access', config.idioma), t('admin_authenticated_success', config.idioma), 'medium', undefined, true);
+        registarAuditoria('LOGIN', `Administrador autenticado com sucesso`);
       } else { 
         setErroPin(true); 
         setPinInput(""); 
-        addNotification('security', t('critical_failure', config.idioma), t('admin_access_failed_incorrect_pin', config.idioma), 'high');
+        addNotification('security', t('critical_failure', config.idioma), t('admin_access_failed_incorrect_pin', config.idioma), 'high', undefined, true);
+        registarAuditoria('SEGURANÇA', `Tentativa falhada de acesso Admin (PIN INCORRETO)`);
       } 
     }
   };
@@ -489,28 +558,31 @@ export default function App() {
     if (!contaNegocio || !podeOperar) return;
     setTelaAtual('dashboard'); 
     
-    const dataToSave = { 
+    const dataToSave = sanitizeData({ 
       ...nova, 
+      produtoId: produtoId || null,
       criadoEm: obterDataHoraCompleta(), 
       autor: role || 'Sistema' 
-    };
-
-    // Remove undefined fields to prevent Firestore errors
-    Object.keys(dataToSave).forEach(key => {
-      if (dataToSave[key] === undefined) {
-        delete dataToSave[key];
-      }
     });
 
-    await addDoc(collection(db, `artifacts/${appId}/public/data/transacoes_${contaNegocio}`), dataToSave);
-    registarAuditoria('ADICIONAR_TRANSACAO', `Registou ${nova.tipo} de ${formatarDinheiro(nova.valor)}`);
+    const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/transacoes_${contaNegocio}`), dataToSave);
     
-    // Decrementar Stock se houver produtoId
+    // Log básico da transação
+    registarAuditoria('ADICIONAR_TRANSACAO', `${nova.tipo === 'entrada' ? 'Venda/Receita' : 'Depósito/Gasto'} de ${formatarDinheiro(nova.valor, config.moeda)} - ${nova.descricao || nova.categoria}`);
+    
+    // Decrementar Stock se houver produtoId e registar auditoria específica de venda
     if (produtoId) {
       const prod = produtos.find(p => p.id === produtoId);
       if (prod) {
+        const novoStock = Math.max(0, prod.stockAtual - 1);
         await updateDoc(doc(db, `artifacts/${appId}/public/data/produtos_${contaNegocio}`, produtoId), {
-           stockAtual: Math.max(0, prod.stockAtual - 1)
+           stockAtual: novoStock
+        });
+        // Log específico da saída de stock por venda
+        registarAuditoria('VENDA_PRODUTO', `Venda de 1 ${prod.unidadeMedida} de ${prod.nome}. Stock restante: ${novoStock}`, { 
+          produtoId: produtoId,
+          quantidadeAfetada: -1,
+          transacaoId: docRef.id
         });
       }
     }
@@ -521,7 +593,9 @@ export default function App() {
         'high_value', 
         t('high_value_transaction', config.idioma), 
         `${role?.toUpperCase()} ${t('registered', config.idioma)} ${formatarDinheiro(nova.valor)} ${t('in', config.idioma)} ${nova.categoria}.`, 
-        'medium'
+        'medium',
+        undefined,
+        true
       );
     }
   };
@@ -531,40 +605,109 @@ export default function App() {
     setTelaAtual('dashboard'); 
     setTransacaoSelecionada(null);
 
-    const dataToUpdate = { ...dadosAtualizados };
-    Object.keys(dataToUpdate).forEach(key => {
-      if (dataToUpdate[key] === undefined) {
-        delete dataToUpdate[key];
-      }
-    });
+    const dataToUpdate = sanitizeData({ ...dadosAtualizados });
 
     updateDoc(doc(db, `artifacts/${appId}/public/data/transacoes_${contaNegocio}`, transacaoSelecionada.id), dataToUpdate);
     registarAuditoria('EDITAR_TRANSACAO', `Editou transação`);
   };
 
-  const apagarTransacao = (id: string, valor: number, categoria: string) => {
+  const apagarTransacao = async (id: string, valor: number, categoria: string) => {
     if (!contaNegocio || !podeOperar) return;
-    mostrarConfirmacao(t('delete', config.idioma), `${t('delete', config.idioma)} ${formatarDinheiro(valor)}?`, () => {
-      deleteDoc(doc(db, `artifacts/${appId}/public/data/transacoes_${contaNegocio}`, id));
+    
+    mostrarConfirmacao(t('delete', config.idioma), `${t('delete', config.idioma)} ${formatarDinheiro(valor)}?`, async () => {
+      // Reverter Stock se houver produtoId associado
+      const trans = transacoes.find(t => t.id === id);
+      if (trans && trans.produtoId) {
+        const prod = produtos.find(p => p.id === trans.produtoId);
+        if (prod) {
+          await updateDoc(doc(db, `artifacts/${appId}/public/data/produtos_${contaNegocio}`, prod.id), {
+            stockAtual: prod.stockAtual + 1
+          });
+          registarAuditoria('REVERSÃO_STOCK', `Reverteu venda de ${prod.nome} (Transação Apagada).`);
+        }
+      }
+
+      await deleteDoc(doc(db, `artifacts/${appId}/public/data/transacoes_${contaNegocio}`, id));
       registarAuditoria('APAGAR_TRANSACAO', `Apagou transação de ${formatarDinheiro(valor)}`);
       setTelaAtual('dashboard');
       setTransacaoSelecionada(null);
     });
   };
 
-  const iniciarSessaoConfirmada = (maquina: Maquina, modo: 'livre' | 'prepago' | 'pospago', mins: number, valor: number) => {
+  const apagarLogAuditoria = async (id: string) => {
+    if (!contaNegocio || !role) return;
+    try {
+      await deleteDoc(doc(db, `artifacts/${appId}/public/data/auditoria_${contaNegocio}`, id));
+    } catch (err) {
+      console.error("Erro ao apagar log:", err);
+      mostrarAlerta(t('error_label', config.idioma), t('execution_failed', config.idioma));
+    }
+  };
+
+  const apagarVariosLogsAuditoria = async (ids: string[]) => {
+    if (!contaNegocio || !role || ids.length === 0) return;
+    try {
+      const promises = ids.map(id => deleteDoc(doc(db, `artifacts/${appId}/public/data/auditoria_${contaNegocio}`, id)));
+      await Promise.all(promises);
+      registarAuditoria('LIMPEZA_AUDITORIA', `Apagou ${ids.length} logs de auditoria`);
+    } catch (err) {
+      console.error("Erro ao apagar logs:", err);
+      mostrarAlerta(t('error_label', config.idioma), t('execution_failed', config.idioma));
+    }
+  };
+
+  const limparAuditoriaCompleta = () => {
+    if (auditoria.length === 0) return;
+    mostrarConfirmacao(
+      t('clean_audit', config.idioma) || 'Limpar Auditoria',
+      t('clean_audit_confirm', config.idioma) || 'Tem certeza que deseja apagar todos os logs?',
+      async () => {
+        const ids = auditoria.map(l => l.id);
+        await apagarVariosLogsAuditoria(ids);
+      }
+    );
+  };
+
+  const iniciarSessaoConfirmada = (maquina: Maquina, modo: 'livre' | 'prepago' | 'pospago' | 'jogos', mins: number, valor: number, totalJogos?: number, nomeJogo?: string) => {
     if (!contaNegocio || !podeOperar) return;
-    const novaSessao = {
+    const novaSessao = sanitizeData({
       maquinaId: maquina.id, maquinaNome: maquina.nome, inicio: Date.now(),
       modo: modo, tempoPrePagoMin: (modo === 'prepago' || modo === 'pospago') ? mins : null,
-      precoHoraAplicado: modo === 'livre' ? valor : null, valorCobrado: (modo === 'prepago' || modo === 'pospago') ? valor : null, 
-      autor: role || 'Sistema', emPausa: false, momentoPausa: null
-    };
+      jogosRestantes: modo === 'jogos' ? totalJogos || 0 : null,
+      totalJogos: modo === 'jogos' ? totalJogos || 0 : null,
+      nomeJogo: modo === 'jogos' ? nomeJogo || '' : null,
+      precoHoraAplicado: modo === 'livre' ? valor : null, valorCobrado: (modo === 'prepago' || modo === 'pospago' || modo === 'jogos') ? valor : null, 
+      autor: role || 'Sistema', emPausa: false, momentoPausa: null,
+      status: 'ativa' // Adding status for consistency if needed by notifications
+    });
     addDoc(collection(db, `artifacts/${appId}/public/data/sessoes_${contaNegocio}`), novaSessao);
-    if (modo === 'prepago') {
-      adicionarTransacao({ tipo: 'entrada', valor: valor, categoria: 'Sessão Jogo', metodo: 'Dinheiro', descricao: `${maquina.nome} [PRÉ-PAGO]`, data: obterDataHoje(), hora: obterHoraAtual() });
+    if (modo === 'prepago' || modo === 'jogos') {
+      adicionarTransacao({ 
+        tipo: 'entrada', 
+        valor: valor, 
+        categoria: 'Sessão Jogo', 
+        metodo: 'Dinheiro', 
+        descricao: `${maquina.nome} [${modo === 'jogos' ? (nomeJogo || 'JOGOS') : 'PRÉ-PAGO'}]`, 
+        data: obterDataHoje(), 
+        hora: obterHoraAtual() 
+      });
     }
-    registarAuditoria('SESSAO_INICIO', `Iniciou ${maquina.nome} (${modo})`);
+    registarAuditoria('SESSAO_INICIO', `Iniciou ${maquina.nome} (${modo}) ${nomeJogo ? `[${nomeJogo}]` : ''}`);
+
+    // Salvar categoria de jogo se for nova
+    if (modo === 'jogos' && nomeJogo?.trim()) {
+      const nomeLimpo = nomeJogo.trim();
+      const currentCategories = Array.isArray(config.categoriasJogos) ? config.categoriasJogos : [];
+      if (!currentCategories.includes(nomeLimpo)) {
+        atualizarConfig({ categoriasJogos: [...currentCategories, nomeLimpo] });
+      }
+    }
+  };
+
+  const excluirCategoriaJogo = (nome: string) => {
+    if (!contaNegocio) return;
+    const novasCategorias = (config.categoriasJogos || []).filter(c => c !== nome);
+    atualizarConfig({ categoriasJogos: novasCategorias });
   };
 
   const alternarPausaSessao = (sessao: Sessao) => {
@@ -594,9 +737,55 @@ export default function App() {
     deleteDoc(doc(db, `artifacts/${appId}/public/data/sessoes_${contaNegocio}`, sessao.id));
   };
 
+  const consumirJogo = async (sessao: Sessao) => {
+    if (!contaNegocio || !podeOperar) return;
+    if (sessao.jogosRestantes === null || sessao.jogosRestantes === undefined || sessao.jogosRestantes <= 0) return;
+
+    const docRef = doc(db, `artifacts/${appId}/public/data/sessoes_${contaNegocio}`, sessao.id);
+    const novosJogos = Math.max(0, sessao.jogosRestantes - 1);
+    
+    if (novosJogos === 0) {
+      addNotification('info', t('no_games_left', config.idioma), `${sessao.maquinaNome}: ${t('no_games_left', config.idioma)}`, 'high');
+    }
+    
+    await updateDoc(docRef, { jogosRestantes: novosJogos });
+    registarAuditoria('JOGO_CONSUMO', `Consumiu jogo na ${sessao.maquinaNome} (${sessao.nomeJogo || 'Geral'}). Restantes: ${novosJogos}`);
+  };
+
+  const adicionarJogos = async (sessao: Sessao, qtd: number, valor: number) => {
+    if (!contaNegocio || !podeOperar) return;
+    
+    try {
+      const docRef = doc(db, `artifacts/${appId}/public/data/sessoes_${contaNegocio}`, sessao.id);
+      const novosRestantes = (sessao.jogosRestantes || 0) + qtd;
+      const novosTotais = (sessao.totalJogos || 0) + qtd;
+      const novoValor = (sessao.valorCobrado || 0) + valor;
+
+      await updateDoc(docRef, { 
+        jogosRestantes: novosRestantes,
+        totalJogos: novosTotais,
+        valorCobrado: novoValor
+      });
+
+      adicionarTransacao({ 
+        tipo: 'entrada', 
+        valor: valor, 
+        categoria: 'Sessão Jogo', 
+        metodo: 'Dinheiro', 
+        descricao: `${sessao.maquinaNome} [+${qtd} JOGOS]`, 
+        data: obterDataHoje(), 
+        hora: obterHoraAtual() 
+      });
+
+      registarAuditoria('JOGO_RECARGA', `Adicionou ${qtd} jogos na ${sessao.maquinaNome}. Total: ${novosTotais}`);
+    } catch (error) {
+      console.error("Erro ao adicionar jogos:", error);
+    }
+  };
+
   const adicionarMaquinaGlobal = async (nome: string) => {
     if (!nome.trim() || !contaNegocio || !podeOperar) return;
-    await addDoc(collection(db, `artifacts/${appId}/public/data/maquinas_${contaNegocio}`), { nome: nome.trim(), criadoEm: Date.now() });
+    await addDoc(collection(db, `artifacts/${appId}/public/data/maquinas_${contaNegocio}`), sanitizeData({ nome: nome.trim(), criadoEm: Date.now() }));
     registarAuditoria('MÁQUINA_ADC', `Adicionou: ${nome}`);
   };
 
@@ -634,7 +823,7 @@ export default function App() {
       onIdiomaChange={(lang) => setConfig(prev => ({ ...prev, idioma: lang }))}
     />
   );
-  if (assinatura && !assinatura.ativa) return <TelaAssinaturaExpirada razao={assinatura.razao} expiracao={assinatura.expiracao} pendente={assinatura.pendente} mensagemAdmin={assinatura.mensagemAdmin} moeda={config.moeda} idioma={config.idioma} fazerLogout={() => { setContaNegocio(null); setRole(null); }} processarComprovativo={processarComprovativo} onUpload={handleUploadComprovativoExistente} />;
+  if (assinatura && !assinatura.ativa) return <TelaAssinaturaExpirada assinatura={assinatura} razao={assinatura.razao} onSair={() => { setContaNegocio(null); setRole(null); }} processarComprovativo={processarComprovativo} onUpload={handleUploadComprovativoExistente} mostrarAlerta={mostrarAlerta} config={config} idioma={config.idioma} />;
   if (loadingDados) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-orange-400 font-bold gap-3"><div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div> {t('opening_cloud', config.idioma)}</div>;
   if (!role) return <TelaSelecaoRole pinInput={pinInput} setPinInput={setPinInput} handleLoginRole={handleLoginRole} erroPin={erroPin} fazerLogout={() => { setContaNegocio(null); setRole(null); }} emailAtual={contaNegocio} funcionarios={funcionarios} config={config} />;
 
@@ -648,22 +837,66 @@ export default function App() {
       <div className={`w-full max-w-md ${temaEscuro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} h-full relative shadow-2xl flex flex-col border-x`}>
         
         
-        {/* Modal UI Handler */}
-        {modalUI.isOpen && (
-          <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+              {modalUI.isOpen && (
+          <div className="fixed inset-0 bg-black/90 z-[3000] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
             {modalUI.type === 'image' ? (
               <div className="relative w-full max-w-2xl flex flex-col items-center">
-                 <button onClick={fecharModal} className="absolute -top-12 right-0 bg-gray-800 text-white p-2 rounded-full"><X size={24}/></button>
-                 <img src={modalUI.imagemUrl} alt="Visualização" className="w-full h-auto max-h-[90vh] object-contain rounded-2xl border border-gray-800" />
+                 <button onClick={fecharModal} className="absolute -top-12 right-0 bg-gray-800 text-white p-2 rounded-full active:scale-90 transition-transform"><X size={24}/></button>
+                 <img src={modalUI.imagemUrl} alt="Visualização" className="w-full h-auto max-h-[80vh] object-contain rounded-3xl border-4 border-gray-800 shadow-2xl" />
               </div>
             ) : (
-             <div className={`w-full max-w-[320px] overflow-hidden shadow-2xl flex flex-col`}>
-                <div className="p-4 bg-gray-800 text-white border-b border-gray-700 font-black uppercase text-sm">{modalUI.titulo}</div>
-                <div className="p-5 flex flex-col gap-4">
-                   <p className="text-sm text-gray-300">{modalUI.mensagem}</p>
+              <div className={`w-full max-w-[320px] overflow-hidden shadow-2xl flex flex-col rounded-[2.5rem] border ${temaEscuro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'}`}>
+                <div className={`p-5 ${temaEscuro ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-50 text-gray-900 border-gray-200'} border-b font-black uppercase text-[10px] tracking-widest flex items-center justify-between`}>
+                   {modalUI.titulo}
+                   <button onClick={fecharModal} className="text-gray-500 hover:text-gray-300"><X size={16}/></button>
+                </div>
+                <div className="p-6 flex flex-col gap-5">
+                   <p className={`text-xs font-bold leading-relaxed ${temaEscuro ? 'text-gray-400' : 'text-gray-600'}`}>{modalUI.mensagem}</p>
+                   
+                   {modalUI.type === 'prompt' && (
+                     <div className="space-y-2">
+                        <label className="text-[9px] font-black text-orange-500 uppercase tracking-widest">{t('required_input', config.idioma)}: {modalUI.inputRequerido}</label>
+                        <input 
+                          type="text" 
+                          value={promptInput} 
+                          onChange={e => setPromptInput(e.target.value)}
+                          className="w-full bg-gray-950 border border-gray-800 p-3 rounded-xl text-white text-sm outline-none focus:border-orange-500 transition-colors"
+                          placeholder="..."
+                        />
+                     </div>
+                   )}
+
                    <div className="flex gap-2">
-                      <button onClick={fecharModal} className="flex-1 py-3 rounded-xl font-bold text-xs bg-gray-800 text-gray-400 uppercase">{t('cancel', config.idioma)}</button>
-                      <button onClick={() => { if (modalUI.onConfirm) modalUI.onConfirm(); fecharModal(); }} className="flex-1 py-3 rounded-xl font-bold text-xs bg-orange-600 text-white uppercase">{t('save', config.idioma)}</button>
+                      {modalUI.type !== 'alert' && (
+                        <button 
+                          onClick={fecharModal} 
+                          className={`flex-1 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border transition-all active:scale-95 ${
+                            temaEscuro ? 'bg-gray-800 text-gray-500 border-gray-700' : 'bg-gray-100 text-gray-500 border-gray-200'
+                          }`}
+                        >
+                          {t('cancel', config.idioma)}
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => { 
+                          if (modalUI.type === 'prompt') {
+                            if (promptInput.toLowerCase().trim() === modalUI.inputRequerido?.toLowerCase().trim()) {
+                              if (modalUI.onConfirm) modalUI.onConfirm();
+                              fecharModal();
+                            } else {
+                              alert(t('incorrect_confirmation', config.idioma) || 'Confirmação incorreta');
+                            }
+                          } else {
+                            if (modalUI.onConfirm) modalUI.onConfirm();
+                            fecharModal();
+                          }
+                        }} 
+                        className={`flex-1 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg transition-all active:scale-95 ${
+                          modalUI.type === 'alert' ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'bg-orange-600 text-white shadow-orange-600/20'
+                        }`}
+                      >
+                        {modalUI.type === 'alert' ? t('close', config.idioma) : t('confirm', config.idioma)}
+                      </button>
                    </div>
                 </div>
               </div>
@@ -720,61 +953,112 @@ export default function App() {
         )}
 
         {menuAberto && (
-          <div className="absolute top-[70px] right-2 w-64 bg-gray-900/98 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-gray-800 z-50 rounded-3xl animate-in fade-in slide-in-from-top-4">
-            <div className="p-3 flex flex-col gap-1">
-              {[
-                { icon: Wallet, text: t('dashboard', config.idioma), tela: 'dashboard' },
-                { 
-                  icon: MonitorPlay, 
-                  text: t('sessions', config.idioma), 
-                  tela: 'sessoes', 
-                  critical: notifications.some(n => n.type === 'session_finished') 
-                },
-                { icon: CalendarIcon, text: t('calendar', config.idioma), tela: 'calendar' }
-              ].map(item => (
-                <button 
-                  key={item.tela} 
-                  onClick={() => { setTelaAtual(item.tela); setMenuAberto(false); }} 
-                  className={`flex items-center gap-3 text-left p-3 rounded-xl transition-colors font-medium text-sm ${
-                    (item as any).critical 
-                      ? 'bg-red-500/20 text-red-400 animate-pulse' 
-                      : 'hover:bg-gray-800 text-gray-300'
-                  }`}
-                >
-                  <div className="relative">
-                    <item.icon size={18} />
-                    {(item as any).critical && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-600 rounded-full animate-ping" />}
-                  </div> 
-                  {item.text}
-                </button>
-              ))}
+          <div className="absolute top-[70px] right-2 w-52 bg-gray-900/98 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-gray-800 z-50 rounded-3xl animate-in fade-in slide-in-from-top-4 max-h-[80vh] overflow-y-auto scrollbar-hide">
+            <div className="p-2.5 flex flex-col gap-1">
+              {/* Navigation Section */}
+              <div className="space-y-0.5">
+                {[
+                  { icon: Wallet, text: t('dashboard', config.idioma), tela: 'dashboard' },
+                  { 
+                    icon: MonitorPlay, 
+                    text: t('sessions', config.idioma), 
+                    tela: 'sessoes', 
+                    critical: notifications.some(n => n.type === 'session_finished') 
+                  },
+                  { icon: CalendarIcon, text: t('calendar', config.idioma), tela: 'calendar' }
+                ].map(item => (
+                  <button 
+                    key={item.tela} 
+                    onClick={() => { setTelaAtual(item.tela); setMenuAberto(false); }} 
+                    className={`w-full flex items-center gap-2 p-2 rounded-xl transition-all font-bold text-[10px] uppercase tracking-wider ${
+                      (item as any).critical 
+                        ? 'bg-red-500/10 text-red-500 ring-1 ring-red-500/30 animate-pulse' 
+                        : (telaAtual === item.tela ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'bg-gray-800/40 hover:bg-gray-800 text-gray-400')
+                    }`}
+                  >
+                    <div className="relative">
+                      <item.icon size={16} />
+                      {(item as any).critical && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-red-600 rounded-full border border-gray-950" />}
+                    </div> 
+                    {item.text}
+                  </button>
+                ))}
+              </div>
+
               {role === 'admin' && (
                 <>
-                  <div className="border-t border-gray-800 my-1"></div>
-                  {[
-                    { icon: BrainCircuit, text: t('intelligence', config.idioma), tela: 'intelligence' },
-                    { icon: Package, text: t('stock', config.idioma), action: () => setGestaoStockAberta(true) },
-                    { icon: Activity, text: t('reports', config.idioma), tela: 'reports' },
-                    { icon: ShieldAlert, text: t('audit_log', config.idioma), tela: 'auditoria' },
-                    { icon: Settings, text: t('settings', config.idioma), tela: 'settings' }
-                  ].map(item => (
-                    <button 
-                      key={item.text} 
-                      onClick={() => { 
-                        if (item.tela) setTelaAtual(item.tela); 
-                        if (item.action) item.action();
-                        setMenuAberto(false); 
-                      }} 
-                      className="flex items-center gap-3 text-left p-3 hover:bg-gray-800 rounded-xl transition-colors font-medium text-sm text-gray-300"
-                    >
-                      <item.icon size={18} /> {item.text}
-                    </button>
-                  ))}
+                  <div className="flex items-center gap-2 my-1">
+                    <div className="h-px flex-1 bg-gray-800"></div>
+                    <span className="text-[7px] font-black text-gray-600 uppercase tracking-widest">{t('management', config.idioma) || 'Gestão'}</span>
+                    <div className="h-px flex-1 bg-gray-800"></div>
+                  </div>
+                  <div className="space-y-0.5">
+                    {[
+                      { icon: BrainCircuit, text: t('intelligence', config.idioma), tela: 'intelligence' },
+                      { icon: Package, text: t('stock', config.idioma), action: () => setGestaoStockAberta(true) },
+                      { icon: Activity, text: t('reports', config.idioma), tela: 'reports' },
+                      { icon: ShieldAlert, text: t('audit_log', config.idioma), tela: 'auditoria' },
+                      { icon: Settings, text: t('settings', config.idioma), tela: 'settings' }
+                    ].map(item => (
+                      <button 
+                        key={item.text} 
+                        onClick={() => { 
+                          if (item.tela) setTelaAtual(item.tela); 
+                          if (item.action) item.action();
+                          setMenuAberto(false); 
+                        }} 
+                        className={`w-full flex items-center gap-2 p-2 rounded-xl transition-all font-bold text-[9px] uppercase tracking-wider ${
+                          item.tela && telaAtual === item.tela ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-gray-800/40 hover:bg-gray-800 text-gray-400 border border-transparent'
+                        }`}
+                      >
+                        <item.icon size={14} /> {item.text}
+                      </button>
+                    ))}
+                  </div>
                 </>
               )}
+
+              {/* Support Section */}
+              <div className="flex items-center gap-2 my-1">
+                <div className="h-px flex-1 bg-gray-800"></div>
+                <span className="text-[7px] font-black text-orange-500 uppercase tracking-widest">{t('support_egman', config.idioma)}</span>
+                <div className="h-px flex-1 bg-gray-800"></div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-1.5">
+                <a 
+                  href="https://web.facebook.com/profile.php?id=61563186747537&sk=following&locale=pt_BR" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center justify-center gap-1 p-2 bg-gray-800/40 hover:bg-blue-600/20 hover:text-blue-400 rounded-xl transition-all text-gray-500"
+                >
+                  <Facebook size={16} />
+                  <span className="text-[6px] font-black uppercase tracking-tighter">FB</span>
+                </a>
+                <a 
+                  href="mailto:egmanoficial@gmail.com" 
+                  className="flex flex-col items-center justify-center gap-1 p-2 bg-gray-800/40 hover:bg-red-600/20 hover:text-red-400 rounded-xl transition-all text-gray-500"
+                >
+                  <Mail size={16} />
+                  <span className="text-[6px] font-black uppercase tracking-tighter">Email</span>
+                </a>
+                <a 
+                  href="https://wa.me/244940192965" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center justify-center gap-1 p-2 bg-gray-800/40 hover:bg-emerald-600/20 hover:text-emerald-400 rounded-xl transition-all text-gray-500"
+                >
+                  <MessageSquare size={16} />
+                  <span className="text-[6px] font-black uppercase tracking-tighter">Whats</span>
+                </a>
+              </div>
+
               <div className="border-t border-gray-800 my-1"></div>
-              <button onClick={() => { setRole(null); setTelaAtual('dashboard'); setMenuAberto(false); }} className="flex items-center gap-3 text-left p-3 hover:bg-gray-800 rounded-xl text-yellow-500 font-bold text-sm"><Lock size={18} /> {t('lock', config.idioma)}</button>
-              <button onClick={() => { setContaNegocio(null); setRole(null); setMenuAberto(false); setTelaAtual('dashboard'); }} className="flex items-center gap-3 text-left p-3 hover:bg-gray-800 rounded-xl text-red-400 font-bold text-sm"><LogIn size={18} /> {t('logout', config.idioma)}</button>
+              
+              <div className="flex gap-1.5">
+                <button onClick={() => { setRole(null); setTelaAtual('dashboard'); setMenuAberto(false); }} className="flex-1 flex items-center justify-center gap-1.5 p-2 bg-yellow-500/10 hover:bg-yellow-500/20 rounded-xl text-yellow-500 font-bold text-[9px] uppercase tracking-wider border border-yellow-500/20 transition-all"><Lock size={12} /> {t('lock', config.idioma)}</button>
+                <button onClick={() => { setContaNegocio(null); setRole(null); setMenuAberto(false); setTelaAtual('dashboard'); }} className="flex-1 flex items-center justify-center gap-1.5 p-2 bg-red-500/10 hover:bg-red-500/20 rounded-xl text-red-500 font-bold text-[9px] uppercase tracking-wider border border-red-500/20 transition-all"><LogIn size={12} /> {t('logout', config.idioma)}</button>
+              </div>
             </div>
           </div>
         )}
@@ -792,6 +1076,7 @@ export default function App() {
                 <Dashboard 
                   transacoes={transacoes} 
                   produtos={produtos} 
+                  auditoria={auditoria}
                   setTelaAtual={setTelaAtual} 
                   role={role!} 
                   podeOperar={podeOperar} 
@@ -843,6 +1128,7 @@ export default function App() {
                   contaNegocio={contaNegocio!}
                   onBack={() => setGestaoStockAberta(false)}
                   mostrarAlerta={mostrarAlerta}
+                  mostrarConfirmacao={mostrarConfirmacao}
                   registarAuditoria={registarAuditoria}
                   temaEscuro={temaEscuro}
                   idioma={config.idioma}
@@ -857,7 +1143,27 @@ export default function App() {
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <GestorSessoes config={config} sessoes={sessoes} maquinas={maquinas} role={role!} podeOperar={podeOperar} iniciarSessaoConfirmada={iniciarSessaoConfirmada} alternarPausaSessao={alternarPausaSessao} terminarSessao={terminarSessao} registarAuditoria={registarAuditoria} mostrarConfirmacao={mostrarConfirmacao} adicionarMaquinaGlobal={adicionarMaquinaGlobal} db={db} appId={appId} contaNegocio={contaNegocio} temaEscuro={temaEscuro} idioma={config.idioma} />
+                <GestorSessoes 
+                  config={config} 
+                  sessoes={sessoes} 
+                  maquinas={maquinas} 
+                  role={role!} 
+                  podeOperar={podeOperar} 
+                  iniciarSessaoConfirmada={iniciarSessaoConfirmada} 
+                  excluirCategoriaJogo={excluirCategoriaJogo}
+                  alternarPausaSessao={alternarPausaSessao} 
+                  terminarSessao={terminarSessao} 
+                  consumirJogo={consumirJogo}
+                  adicionarJogos={adicionarJogos}
+                  registarAuditoria={registarAuditoria} 
+                  mostrarConfirmacao={mostrarConfirmacao} 
+                  adicionarMaquinaGlobal={adicionarMaquinaGlobal} 
+                  db={db} 
+                  appId={appId} 
+                  contaNegocio={contaNegocio} 
+                  temaEscuro={temaEscuro} 
+                  idioma={config.idioma} 
+                />
               </motion.div>
             )}
             {telaAtual === 'calendar' && (
@@ -897,7 +1203,14 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <Auditoria logs={auditoria} temaEscuro={temaEscuro} idioma={config.idioma} />
+                <Auditoria 
+                  logs={auditoria} 
+                  temaEscuro={temaEscuro} 
+                  idioma={config.idioma} 
+                  apagarLog={apagarLogAuditoria}
+                  limparTudo={limparAuditoriaCompleta}
+                  confirmarAction={mostrarConfirmacao}
+                />
               </motion.div>
             )}
             {telaAtual === 'settings' && role === 'admin' && (

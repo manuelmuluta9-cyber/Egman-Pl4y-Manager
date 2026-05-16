@@ -41,8 +41,10 @@ export interface Config {
   sistemaAberto: boolean;
   categoriasEntrada: string[];
   categoriasDespesa: string[];
+  categoriasJogos?: string[];
   moeda?: string;
   idioma?: string;
+  precoJogo?: number;
   onboardingCompleto?: boolean;
   metodosPagamento?: string[];
   modoExibicao?: 'geral' | 'maquina';
@@ -59,6 +61,7 @@ export interface Transacao {
   hora: string;
   criadoEm: string;
   autor: string;
+  produtoId?: string;
 }
 
 export interface Sessao {
@@ -66,8 +69,11 @@ export interface Sessao {
   maquinaId: string;
   maquinaNome: string;
   inicio: number;
-  modo: 'livre' | 'prepago' | 'pospago';
+  modo: 'livre' | 'prepago' | 'pospago' | 'jogos';
   tempoPrePagoMin: number | null;
+  jogosRestantes: number | null;
+  totalJogos: number | null;
+  nomeJogo?: string;
   precoHoraAplicado: number | null;
   valorCobrado: number | null;
   autor: string;
@@ -89,6 +95,11 @@ export interface AuditoriaLog {
   dataHora: string;
   data: string;
   hora: string;
+  metadata?: {
+    produtoId?: string;
+    quantidadeAfetada?: number;
+    transacaoId?: string;
+  };
 }
 
 export interface MensagemEquipa {

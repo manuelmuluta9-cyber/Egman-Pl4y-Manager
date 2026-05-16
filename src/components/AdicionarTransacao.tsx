@@ -201,7 +201,7 @@ export function AdicionarTransacao({ transacaoInicial, onSalvar, onCancelar, con
                            onClick={() => {
                               setProdutoSelecionado(p);
                               setValor(p.precoVenda.toString());
-                              setDescricao(`Venda: ${p.nome}`);
+                              setDescricao(`${t('sale_prefix', idioma)}: ${p.nome}`);
                               setMostrarProdutos(false);
                            }}
                            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all active:scale-[0.98] ${produtoSelecionado?.id === p.id ? 'bg-orange-600 border-orange-500 text-white shadow-lg shadow-orange-500/20' : (temaEscuro ? 'bg-gray-900 border-gray-800 text-gray-400 hover:border-gray-700' : 'bg-white border-gray-200 text-gray-600 hover:border-orange-500 shadow-sm')} ${p.stockAtual <= 0 ? 'opacity-20 cursor-not-allowed' : ''}`}
@@ -209,7 +209,7 @@ export function AdicionarTransacao({ transacaoInicial, onSalvar, onCancelar, con
                             <div className="text-left">
                                <div className="text-xs font-black uppercase tracking-tight flex items-center gap-2">
                                  {p.nome} 
-                                 <span className={`px-2 py-0.5 rounded-full text-[9px] ${p.stockAtual > p.stockMinimo ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>STOCK: {p.stockAtual}</span>
+                                 <span className={`px-2 py-0.5 rounded-full text-[9px] ${p.stockAtual > p.stockMinimo ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>{t('stock', idioma)}: {p.stockAtual}</span>
                                </div>
                                <div className="text-[9px] font-bold opacity-60 uppercase mt-1 tracking-widest">{p.categoria}</div>
                             </div>
@@ -227,7 +227,7 @@ export function AdicionarTransacao({ transacaoInicial, onSalvar, onCancelar, con
           <div className="space-y-3">
              <label className="text-[9px] text-gray-500 font-black uppercase tracking-[0.2em] px-1 flex items-center gap-1.5">
                 <Monitor size={10} className="text-gray-700" />
-                Máquina (Opcional)
+                {t('machine_optional', idioma)}
              </label>
              <div className="flex flex-wrap gap-2">
                 <button 
@@ -235,7 +235,7 @@ export function AdicionarTransacao({ transacaoInicial, onSalvar, onCancelar, con
                   onClick={() => setMaquinaSelecionada('')}
                   className={`px-3 py-2 text-[8px] font-black uppercase tracking-widest rounded-xl border transition-all ${!maquinaSelecionada ? 'bg-orange-500 text-orange-950 border-orange-500' : (temaEscuro ? 'bg-gray-900 border-gray-800 text-gray-500' : 'bg-white border-gray-200 text-gray-600 shadow-sm')}`}
                 >
-                   Nenhuma
+                   {t('none', idioma)}
                 </button>
                 {maquinas.map(m => (
                   <button 

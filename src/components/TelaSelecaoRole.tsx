@@ -38,31 +38,31 @@ export function TelaSelecaoRole({ pinInput, setPinInput, handleLoginRole, erroPi
           <span className="text-[9px] font-bold text-gray-300 uppercase truncate max-w-[120px]">{emailAtual.replace(/_/g, '.')}</span>
         </div>
         
-        <div className={`flex flex-col items-center transition-all duration-300 ${(selecionandoAdmin || selecionandoFuncionario) ? 'mt-4 mb-4' : 'mt-16 mb-6'}`}>
-          <EgmanLogo size={(selecionandoAdmin || selecionandoFuncionario) ? 80 : 140} className="mb-4 drop-shadow-2xl transition-all" />
-          <h1 className="text-xl font-black tracking-widest text-white">EGMAN <span className="text-orange-500">PLAY</span></h1>
-          <p className="text-gray-400 text-[10px] tracking-widest uppercase mt-1">
+        <div className={`flex flex-col items-center transition-all duration-300 ${(selecionandoAdmin || selecionandoFuncionario) ? 'mt-4 mb-2' : 'mt-8 mb-4'}`}>
+          <EgmanLogo size={(selecionandoAdmin || selecionandoFuncionario) ? 60 : 100} className="mb-2 drop-shadow-2xl transition-all" />
+          <h1 className="text-lg font-black tracking-widest text-white">EGMAN <span className="text-orange-500">PLAY</span></h1>
+          <p className="text-gray-400 text-[9px] tracking-widest uppercase mt-0.5">
             {funcionarioSelecionado ? `${t('welcome_msg', idioma)}, ${funcionarioSelecionado.nome}` : selecionandoFuncionario ? t('select_your_profile', idioma) : t('who_is_using', idioma)}
           </p>
         </div>
 
         {(!selecionandoAdmin && !selecionandoFuncionario) && (
-          <div className="w-full max-w-[280px] flex flex-col gap-4 animate-in slide-in-from-bottom-4">
-            <button onClick={() => setSelecionandoFuncionario(true)} className="bg-gray-800 p-5 rounded-2xl flex items-center justify-between hover:bg-gray-700 transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="bg-gray-700 p-3 rounded-xl"><Users size={24}/></div>
-                <div className="text-left"><p className="font-bold text-white text-lg">{t('employee_role', idioma)}</p><p className="text-[10px] text-gray-400">{t('restricted_access', idioma)}</p></div>
+          <div className="w-full max-w-[240px] flex flex-col gap-3 animate-in slide-in-from-bottom-4">
+            <button onClick={() => setSelecionandoFuncionario(true)} className="bg-gray-800 p-3 rounded-2xl flex items-center justify-between hover:bg-gray-700 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="bg-gray-700 p-2.5 rounded-xl"><Users size={18}/></div>
+                <div className="text-left"><p className="font-bold text-white text-sm">{t('employee_role', idioma)}</p><p className="text-[9px] text-gray-500 leading-none">{t('restricted_access', idioma)}</p></div>
               </div>
-              <ChevronRight className="text-gray-500" />
+              <ChevronRight size={14} className="text-gray-500" />
             </button>
-            <button onClick={() => setSelecionandoAdmin(true)} className="bg-gray-800 p-5 rounded-2xl flex items-center justify-between hover:bg-gray-700 transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="bg-gray-700 p-3 rounded-xl"><UserCog size={24}/></div>
-                <div className="text-left"><p className="font-bold text-white text-lg">{t('admin_role', idioma)}</p><p className="text-[10px] text-gray-400">{t('total_control', idioma)}</p></div>
+            <button onClick={() => setSelecionandoAdmin(true)} className="bg-gray-800 p-3 rounded-2xl flex items-center justify-between hover:bg-gray-700 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="bg-gray-700 p-2.5 rounded-xl"><UserCog size={18}/></div>
+                <div className="text-left"><p className="font-bold text-white text-sm">{t('admin_role', idioma)}</p><p className="text-[9px] text-gray-500 leading-none">{t('total_control', idioma)}</p></div>
               </div>
-              <ChevronRight className="text-gray-500" />
+              <ChevronRight size={14} className="text-gray-500" />
             </button>
-            <button onClick={fazerLogout} className="mt-6 text-[10px] font-bold text-red-500 uppercase tracking-widest flex justify-center items-center gap-1 w-full p-2 hover:bg-red-500/10 rounded-lg"><LogIn size={12}/> {t('logout', idioma)}</button>
+            <button onClick={fazerLogout} className="mt-4 text-[9px] font-black text-red-500 uppercase tracking-[0.2em] flex justify-center items-center gap-1.5 w-full p-2.5 hover:bg-red-500/10 rounded-xl border border-red-500/10 transition-colors"><LogIn size={12}/> {t('logout', idioma)}</button>
           </div>
         )}
 

@@ -3,6 +3,17 @@ import { twMerge } from 'tailwind-merge';
 import { auth } from './firebase';
 import { OperationType, FirestoreErrorInfo } from '../types';
 
+export function sanitizeData(data: any): any {
+  if (data === null || typeof data !== 'object') return data;
+  const result: any = Array.isArray(data) ? [] : {};
+  Object.keys(data).forEach(key => {
+    if (data[key] !== undefined) {
+      result[key] = typeof data[key] === 'object' ? sanitizeData(data[key]) : data[key];
+    }
+  });
+  return result;
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -82,9 +93,11 @@ export const processarComprovativo = (file: File, maxSize = 1200): Promise<strin
 
 export const DADOS_PAGAMENTO = {
   telefoneMCX: "942874297",
-  iban: "AO06 0040 0000 0000 0000 0000 0",
-  titular: "EGMAN CLOUD",
+  titular: "Manuel António Vieira Muluta",
+  bfa: "0006 0000 43411134301 58",
+  atlantico: "0055 0000 38911230101 24",
   redotPayUid: "1652490958",
+  paypalEmail: "clipmanoel@gmail.com",
   obterPrecoMensal: (moeda: string) => {
     switch (moeda) {
       case '$': return 5;

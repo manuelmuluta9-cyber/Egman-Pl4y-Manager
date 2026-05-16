@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Key, UserCog, LogIn, ArrowRight, ChevronLeft, Clock, Crown, UploadCloud, Info, Globe } from 'lucide-react';
+import { Mail, Key, UserCog, LogIn, ArrowRight, ChevronLeft, Clock, Crown, UploadCloud, Info, Globe, X, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, appId } from '../lib/firebase';
 import { EgmanLogo } from './EgmanLogo';
@@ -52,10 +53,13 @@ export function TelaAutenticacao({ onCustomAuth, erroExterno, processarComprovat
   const [password, setPassword] = useState('');
   const [pinRecuperacao, setPinRecuperacao] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mostrarIdiomas, setMostrarIdiomas] = useState(false);
   const [erro, setErro] = useState('');
   const [mesesSelecionados, setMesesSelecionados] = useState(1);
   const [previewImagem, setPreviewImagem] = useState<string | null>(null);
   const [mensagemAdm, setMensagemAdm] = useState("");
+  const [metodoPagamento, setMetodoPagamento] = useState<'mcx' | 'usd' | 'usdt' | 'iban'>('mcx');
+  const [alertaAngolaFechado, setAlertaAngolaFechado] = useState(false);
 
   const [recStage, setRecStage] = useState(1);
   const [recEmail, setRecEmail] = useState('');
@@ -228,11 +232,11 @@ export function TelaAutenticacao({ onCustomAuth, erroExterno, processarComprovat
                     onChange={e => setMoeda(e.target.value)}
                     className="w-full bg-transparent text-white font-black text-lg outline-none"
                  >
-                    <option value="Kz" className="bg-gray-900">Kwanza (AOA)</option>
-                    <option value="$" className="bg-gray-900">Dólar (USD)</option>
-                    <option value="€" className="bg-gray-900">Euro (EUR)</option>
-                    <option value="R$" className="bg-gray-900">Real (BRL)</option>
-                    <option value="MT" className="bg-gray-900">Metical (MZN)</option>
+                    <option value="Kz" className="bg-gray-900">{t('kwanza_ao', idioma)}</option>
+                    <option value="$" className="bg-gray-900">{t('dollar_usd', idioma)}</option>
+                    <option value="€" className="bg-gray-900">{t('euro_eur', idioma)}</option>
+                    <option value="R$" className="bg-gray-900">{t('real_brl', idioma)}</option>
+                    <option value="MT" className="bg-gray-900">{t('metical_mzn', idioma)}</option>
                  </select>
               </div>
 
@@ -395,23 +399,135 @@ export function TelaAutenticacao({ onCustomAuth, erroExterno, processarComprovat
                  </p>
               </div>
 
-              <div className="flex flex-col gap-3">
-                 <div className="bg-gray-950 p-3 rounded-xl border border-gray-800">
-                   <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Multicaixa Express (AO)</p>
-                   <div className="flex items-center justify-between">
-                     <p className="font-mono text-lg font-black text-emerald-400">{DADOS_PAGAMENTO.telefoneMCX}</p>
-                     <button onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.telefoneMCX); alert(t('copied', idioma)); }} className="p-2 text-xs font-bold text-gray-300 bg-gray-900 rounded-lg">{t('copy', idioma)}</button>
-                   </div>
-                 </div>
+              <div className="flex gap-1.5 mb-2 overflow-x-auto pb-1 no-scrollbar">
+                 <button 
+                   onClick={() => { setMetodoPagamento('mcx'); setAlertaAngolaFechado(false); }}
+                   className={`shrink-0 px-4 py-3 rounded-xl border text-[9px] font-black uppercase transition-all ${metodoPagamento === 'mcx' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-500'}`}
+                 >
+                   {t('multicaixa_express', idioma)}
+                 </button>
+                 <button 
+                   onClick={() => { setMetodoPagamento('iban'); setAlertaAngolaFechado(false); }}
+                   className={`shrink-0 px-4 py-3 rounded-xl border text-[9px] font-black uppercase transition-all ${metodoPagamento === 'iban' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-500'}`}
+                 >
+                   {t('bank_transfer', idioma)}
+                 </button>
+                 <button 
+                   onClick={() => setMetodoPagamento('usdt')}
+                   className={`shrink-0 px-4 py-3 rounded-xl border text-[9px] font-black uppercase transition-all ${metodoPagamento === 'usdt' ? 'bg-orange-600 border-orange-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-500'}`}
+                 >
+                   USDT / USD
+                 </button>
+              </div>
 
-                 {DADOS_PAGAMENTO.redotPayUid && (
-                   <div className="bg-gray-950 p-3 rounded-xl border border-orange-500/20">
-                     <p className="text-[10px] text-orange-400 font-bold uppercase tracking-widest mb-1">RedotPay (USDT/USD)</p>
+              {(metodoPagamento === 'mcx' || metodoPagamento === 'iban') && !alertaAngolaFechado && (
+                <div className="mb-4 bg-red-600 p-3 rounded-xl flex items-center justify-between gap-2 animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.4)] border border-red-500">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle size={18} className="text-white shrink-0" />
+                    <p className="text-[10px] text-white font-black uppercase tracking-widest leading-tight">
+                      {t('only_angola', idioma)}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setAlertaAngolaFechado(true)}
+                    className="p-1 hover:bg-white/20 rounded-full transition-colors"
+                  >
+                    <X size={14} className="text-white" />
+                  </button>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-3">
+                 {metodoPagamento === 'mcx' ? (
+                   <motion.div 
+                     initial={{ opacity: 0, y: 10 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     className="bg-gray-950 p-4 rounded-2xl border border-gray-800 shadow-inner group relative overflow-hidden"
+                   >
+                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/40 via-transparent to-transparent"></div>
+                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                       {t('multicaixa_express', idioma)} (AO)
+                     </p>
                      <div className="flex items-center justify-between">
-                       <p className="font-mono text-sm font-black text-white">UID: {DADOS_PAGAMENTO.redotPayUid}</p>
-                       <button onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.redotPayUid!); alert(t('copied', idioma)); }} className="p-2 text-xs font-bold text-gray-300 bg-gray-900 rounded-lg">{t('copy', idioma)}</button>
+                       <p className="font-mono text-2xl font-black text-white tracking-widest">{DADOS_PAGAMENTO.telefoneMCX}</p>
+                       <button 
+                         onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.telefoneMCX); alert(t('copied', idioma)); }} 
+                         className="p-2.5 text-[10px] font-black text-emerald-400 bg-emerald-500/10 rounded-xl hover:bg-emerald-500/20 transition-all uppercase tracking-tight"
+                       >
+                         {t('copy', idioma)}
+                       </button>
                      </div>
-                   </div>
+                   </motion.div>
+                 ) : metodoPagamento === 'iban' ? (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-gray-950 p-4 rounded-2xl border border-blue-500/20 shadow-inner group relative overflow-hidden space-y-3"
+                  >
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500/40 via-transparent to-transparent"></div>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                      {t('bank_transfer', idioma)}
+                    </p>
+                    
+                    <div>
+                      <p className="text-[8px] text-gray-600 font-black uppercase mb-0.5">{t('titular', idioma)}</p>
+                      <p className="text-xs font-black text-white uppercase">{DADOS_PAGAMENTO.titular}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between bg-gray-900/50 p-2 rounded-xl border border-gray-800">
+                        <div className="flex flex-col">
+                          <span className="text-[7px] text-blue-400 font-black uppercase">BFA</span>
+                          <span className="font-mono text-[10px] font-black text-white">{DADOS_PAGAMENTO.bfa!}</span>
+                        </div>
+                        <button 
+                          onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.bfa!); alert(t('copied', idioma)); }} 
+                          className="p-1.5 text-[8px] font-black text-blue-400 bg-blue-500/10 rounded-lg uppercase"
+                        >
+                          {t('copy', idioma)}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-gray-900/50 p-2 rounded-xl border border-gray-800">
+                        <div className="flex flex-col">
+                          <span className="text-[7px] text-blue-400 font-black uppercase">ATLÂNTICO</span>
+                          <span className="font-mono text-[10px] font-black text-white">{DADOS_PAGAMENTO.atlantico!}</span>
+                        </div>
+                        <button 
+                          onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.atlantico!); alert(t('copied', idioma)); }} 
+                          className="p-1.5 text-[8px] font-black text-blue-400 bg-blue-500/10 rounded-lg uppercase"
+                        >
+                          {t('copy', idioma)}
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                 ) : (
+                   <motion.div 
+                     initial={{ opacity: 0, y: 10 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     className="bg-gray-950 p-4 rounded-2xl border border-orange-500/20 shadow-inner group relative overflow-hidden"
+                   >
+                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500/40 via-transparent to-transparent"></div>
+                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                       <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+                       RedotPay (USDT / USD)
+                     </p>
+                     <div className="flex items-center justify-between">
+                       <div>
+                         <p className="text-[8px] text-gray-600 font-black uppercase mb-0.5">Account ID / UID</p>
+                         <p className="font-mono text-xl font-black text-white">{DADOS_PAGAMENTO.redotPayUid}</p>
+                       </div>
+                       <button 
+                         onClick={() => { navigator.clipboard.writeText(DADOS_PAGAMENTO.redotPayUid!); alert(t('copied', idioma)); }} 
+                         className="p-2.5 text-[10px] font-black text-orange-400 bg-orange-500/10 rounded-xl hover:bg-orange-500/20 transition-all uppercase tracking-tight"
+                       >
+                         {t('copy', idioma)}
+                       </button>
+                     </div>
+                   </motion.div>
                  )}
               </div>
            </div>
@@ -433,27 +549,45 @@ export function TelaAutenticacao({ onCustomAuth, erroExterno, processarComprovat
     <div className="min-h-screen bg-gray-950 flex justify-center items-center font-sans text-gray-100 p-4">
       <div className="w-full max-w-md bg-gray-900 flex flex-col items-center p-8 rounded-3xl shadow-2xl relative border border-gray-800">
         
-        {/* Language Selector Above Auth Card */}
-        <div className="w-full max-w-xs flex justify-center gap-3 mb-8 bg-gray-900/50 backdrop-blur-sm p-2 rounded-2xl border border-gray-800/50">
-          {Object.entries(languages).map(([code, data]) => (
-            <button 
-              key={code}
-              onClick={() => handleIdiomaSelect(code)}
-              title={data.label}
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all relative group ${idioma === code ? 'bg-orange-500/20 border-2 border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-gray-800 border border-transparent hover:bg-gray-700'}`}
-            >
-              <span>{data.flag}</span>
-              {idioma === code && (
-                <div className="absolute -bottom-1 -right-1 bg-orange-500 rounded-full p-0.5 border border-gray-900">
-                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
-                </div>
-              )}
-              <span className="absolute -top-8 bg-gray-800 text-white text-[8px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase pointer-events-none whitespace-nowrap">
-                {data.label}
-              </span>
-            </button>
-          ))}
+        {/* Botão de Idioma */}
+        <div className="absolute top-6 right-6 z-10">
+          <button 
+            onClick={() => setMostrarIdiomas(!mostrarIdiomas)}
+            className={`p-3 rounded-full transition-all border ${mostrarIdiomas ? 'bg-orange-600 border-orange-500 text-white shadow-lg' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white'}`}
+          >
+            {mostrarIdiomas ? <X size={18} /> : <Globe size={18} />}
+          </button>
         </div>
+
+        <AnimatePresence>
+          {mostrarIdiomas && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              className="w-full max-w-xs flex justify-center gap-3 mb-8 bg-gray-900/90 backdrop-blur-md p-3 rounded-3xl border border-orange-500/30 shadow-2xl shadow-orange-500/10 z-20"
+            >
+              {Object.entries(languages).map(([code, data]) => (
+                <button 
+                  key={code}
+                  onClick={() => {
+                    handleIdiomaSelect(code);
+                    setTimeout(() => setMostrarIdiomas(false), 300);
+                  }}
+                  title={data.label}
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all relative group ${idioma === code ? 'bg-orange-500/20 border-2 border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-gray-800 border border-transparent hover:bg-gray-700'}`}
+                >
+                  <span>{data.flag}</span>
+                  {idioma === code && (
+                    <div className="absolute -bottom-1 -right-1 bg-orange-500 rounded-full p-0.5 border border-gray-900">
+                      <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div 
           className="mb-6 flex flex-col items-center select-none active:scale-95 transition-transform cursor-pointer"

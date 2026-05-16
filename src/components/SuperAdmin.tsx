@@ -327,54 +327,53 @@ export function SuperAdmin({ onSair, temaEscuro }: SuperAdminProps) {
   return (
     <div className="fixed inset-0 z-[1000] bg-[#05080c] flex flex-col overflow-hidden text-white font-sans">
       {/* Header Estilo Cloud Admin */}
-      <header className="p-6 bg-[#0a0f18] border-b border-indigo-500/20 flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg shadow-indigo-500/20">
-            <ShieldCheck size={24} className="text-white" />
+      <header className="p-4 bg-[#0a0f18] border-b border-indigo-500/20 flex justify-between items-center shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20">
+            <ShieldCheck size={18} className="text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-black uppercase tracking-widest leading-none">Cloud Admin</h1>
-            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-tighter mt-1">Torre de Controlo</p>
+            <h1 className="text-sm font-black uppercase tracking-widest leading-none">Cloud Admin</h1>
+            <p className="text-[8px] text-indigo-400 font-bold uppercase tracking-tighter mt-0.5">Control Tower</p>
           </div>
         </div>
         <button 
           onClick={onSair}
-          className="bg-red-500/10 text-red-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-red-500/20 flex items-center gap-2 active:scale-95 transition-all"
+          className="bg-red-500/10 text-red-500 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border border-red-500/20 flex items-center gap-1 active:scale-95 transition-all"
         >
-          <Ban size={14} /> Sair
+          <Ban size={12} /> Exit
         </button>
       </header>
 
-      {/* Navegação Topo */}
-      <div className="flex p-4 gap-2 bg-[#0a0f18]/50 shrink-0">
+      <div className="flex p-3 gap-1.5 bg-[#0a0f18]/50 shrink-0">
         <button 
           onClick={() => setAba('global')}
-          className={`flex-1 py-3 rounded-2xl flex items-center justify-center transition-all ${aba === 'global' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'bg-gray-900 border border-gray-800 text-gray-500'}`}
+          className={`flex-1 py-2.5 rounded-xl flex items-center justify-center transition-all ${aba === 'global' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'bg-gray-900 border border-gray-800 text-gray-500'}`}
         >
-          <TrendingUp size={20} />
+          <TrendingUp size={16} />
         </button>
         <button 
           onClick={() => setAba('clientes')}
-          className={`flex-1 py-3 rounded-2xl flex items-center justify-center transition-all ${aba === 'clientes' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'bg-gray-900 border border-gray-800 text-gray-500'}`}
+          className={`flex-1 py-2.5 rounded-xl flex items-center justify-center transition-all ${aba === 'clientes' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'bg-gray-900 border border-gray-800 text-gray-500'}`}
         >
-          <Users size={20} />
+          <Users size={16} />
         </button>
         <button 
           onClick={() => setAba('validacoes')}
-          className={`flex-1 py-3 rounded-2xl flex items-center justify-center transition-all relative ${aba === 'validacoes' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'bg-gray-900 border border-gray-800 text-gray-500'}`}
+          className={`flex-1 py-2.5 rounded-xl flex items-center justify-center transition-all relative ${aba === 'validacoes' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'bg-gray-900 border border-gray-800 text-gray-500'}`}
         >
-          <Banknote size={20} />
+          <Banknote size={16} />
           {stats.pendentes > 0 && (
-            <span className="absolute top-2 right-2 w-4 h-4 bg-red-500 rounded-full text-[8px] font-black flex items-center justify-center animate-bounce">
+            <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-red-500 rounded-full text-[7px] font-black flex items-center justify-center animate-bounce">
               {stats.pendentes}
             </span>
           )}
         </button>
         <button 
           onClick={() => setAba('avisos')}
-          className={`flex-1 py-3 rounded-2xl flex items-center justify-center transition-all relative ${aba === 'avisos' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'bg-gray-900 border border-gray-800 text-gray-500'}`}
+          className={`flex-1 py-2.5 rounded-xl flex items-center justify-center transition-all relative ${aba === 'avisos' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'bg-gray-900 border border-gray-800 text-gray-500'}`}
         >
-          <MessageSquare size={20} />
+          <MessageSquare size={16} />
         </button>
       </div>
 

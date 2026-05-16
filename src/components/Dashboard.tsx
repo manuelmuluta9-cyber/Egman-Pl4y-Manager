@@ -3,14 +3,16 @@ import {
   TrendingUp, TrendingDown, Wallet, Banknote, Coffee, ChevronRight, 
   Clock as ClockIcon, Zap, LayoutGrid, Monitor 
 } from 'lucide-react';
-import { Transacao, Maquina, Role, Produto, Config } from '../types';
+import { Transacao, Maquina, Role, Produto, Config, AuditoriaLog } from '../types';
 import { formatarDinheiro, obterDataHoje } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { t as translate } from '../lib/translations';
+import { Package } from 'lucide-react';
 
  interface Props {
   transacoes: Transacao[];
   produtos: Produto[];
+  auditoria: AuditoriaLog[];
   setTelaAtual: (tela: any) => void;
   role: Role;
   podeOperar: boolean;
@@ -42,34 +44,59 @@ function TransacaoItem({ t, podeOperar, editarTransacao, index, temaEscuro, moed
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
       onClick={() => podeOperar && editarTransacao(t)} 
-      className={`${temaEscuro ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-gray-200 shadow-sm'} backdrop-blur-sm border p-2 rounded-[1.25rem] flex justify-between items-center group transition-all ${podeOperar ? 'cursor-pointer hover:bg-gray-800/80 hover:border-orange-500/50 active:scale-[0.98]' : ''}`}
+      className={`${temaEscuro ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-gray-200 shadow-sm'} backdrop-blur-sm border p-1.5 px-2 rounded-xl flex justify-between items-center group transition-all ${podeOperar ? 'cursor-pointer hover:bg-gray-800/80 hover:border-orange-500/50 active:scale-[0.98]' : ''}`}
     >
-      <div className="flex items-center gap-2">
-        <div className={`p-1.5 rounded-xl ${t.tipo === 'entrada' ? 'bg-emerald-500/10 text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)]'}`}>
-          {t.tipo === 'entrada' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+      <div className="flex items-center gap-1.5">
+        <div className={`p-1 rounded-lg ${t.tipo === 'entrada' ? 'bg-emerald-500/10 text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)]'}`}>
+          {t.tipo === 'entrada' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
         </div>
         <div className="min-w-0">
-          <p className={`font-bold ${temaEscuro ? 'text-gray-200' : 'text-gray-900'} text-[11px] leading-tight uppercase tracking-tight truncate`}>{t.categoria}</p>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[8px] text-gray-500 font-mono tracking-tight">{t.hora}</span>
-            <span className="w-0.5 h-0.5 bg-gray-700 rounded-full"></span>
-            <span className="text-[8px] text-gray-600 font-bold uppercase truncate max-w-[80px]">{t.descricao || t.metodo || translate('cash', idioma)}</span>
+          <p className={`font-bold ${temaEscuro ? 'text-gray-200' : 'text-gray-900'} text-[9px] leading-none uppercase tracking-tight truncate`}>{t.categoria}</p>
+          <div className="flex items-center gap-1 mt-0.5">
+            <span className="text-[7px] text-gray-500 font-mono tracking-tight">{t.hora}</span>
+            <span className="text-[7px] text-gray-600 font-bold uppercase truncate max-w-[80px]">{t.descricao || t.metodo}</span>
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <div className="text-right">
-          <p className={`font-black text-xs ${t.tipo === 'entrada' ? 'text-emerald-400' : 'text-red-400'}`}>
+          <p className={`font-black text-[10px] ${t.tipo === 'entrada' ? 'text-emerald-400' : 'text-red-400'}`}>
             {t.tipo === 'entrada' ? '+' : '-'}{formatarDinheiro(t.valor, moeda)}
           </p>
         </div>
-        {podeOperar && <ChevronRight size={14} className="text-gray-700 group-hover:text-orange-400 transition-colors" />}
+        {podeOperar && <ChevronRight size={10} className="text-gray-700" />}
       </div>
     </motion.div>
   );
 }
 
-export function Dashboard({ transacoes, produtos, podeOperar, editarTransacao, temaEscuro, moeda, idioma, maquinas, config, atualizarConfig }: Props) {
+function AuditoriaItem({ log, index, temaEscuro }: { log: AuditoriaLog, index: number, temaEscuro: boolean, key?: string }) {
+    const isStockOut = log.acao === 'VENDA_PRODUTO' || log.acao === 'SAÍDA_STOCK';
+    
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.05 }}
+        className={`${temaEscuro ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-gray-200 shadow-sm'} backdrop-blur-sm border p-1.5 px-2 rounded-xl flex justify-between items-center group transition-all`}
+      >
+        <div className="flex items-center gap-1.5">
+          <div className={`p-1 rounded-lg ${isStockOut ? 'bg-orange-500/10 text-orange-500' : 'bg-blue-500/10 text-blue-500'}`}>
+            <Package size={12} />
+          </div>
+          <div className="min-w-0">
+            <p className={`font-bold ${temaEscuro ? 'text-gray-200' : 'text-gray-900'} text-[9px] leading-none uppercase tracking-tight truncate`}>{log.acao.replace(/_/g, ' ')}</p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <span className="text-[7px] text-gray-500 font-mono tracking-tight">{log.hora}</span>
+              <span className="text-[7px] text-gray-400 font-bold truncate max-w-[150px]">{log.detalhe}</span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+}
+
+export function Dashboard({ transacoes, produtos, auditoria, podeOperar, editarTransacao, temaEscuro, moeda, idioma, maquinas, config, atualizarConfig }: Props) {
   const [currentTime, setCurrentTime] = useState(new Date());
   
   useEffect(() => {
@@ -255,16 +282,16 @@ export function Dashboard({ transacoes, produtos, podeOperar, editarTransacao, t
             {config.modoExibicao === 'maquina' ? translate('machines', idioma || 'pt-AO') : translate('actions', idioma || 'pt-AO')}
           </h3>
           <span className="text-[8px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-full font-black uppercase">
-            {config.modoExibicao === 'maquina' ? `${maquinas.length} Maquinas` : `${transacoesHoje.length} ${translate('ops', idioma || 'pt-AO')}`}
+            {config.modoExibicao === 'maquina' ? `${maquinas.length} ${translate('machines', idioma || 'pt-AO')}` : `${transacoesHoje.length} ${translate('ops', idioma || 'pt-AO')}`}
           </span>
         </div> 
 
         {config.modoExibicao === 'maquina' ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
              {maquinas.length === 0 ? (
-                <div className={`text-center py-8 ${temaEscuro ? 'bg-gray-900/30 border-gray-800' : 'bg-gray-50 border-gray-200'} rounded-[2rem] border border-dashed`}>
-                   <Monitor size={30} className="text-gray-700 mx-auto mb-2 opacity-50" />
-                   <p className="text-gray-600 text-[9px] font-black uppercase tracking-widest">Nenhuma máquina registada</p>
+                <div className={`text-center py-6 ${temaEscuro ? 'bg-gray-900/30 border-gray-800' : 'bg-gray-50 border-gray-200'} rounded-2xl border border-dashed`}>
+                   <Monitor size={24} className="text-gray-700 mx-auto mb-2 opacity-50" />
+                   <p className="text-gray-600 text-[8px] font-black uppercase tracking-widest">{translate('no_machines', idioma || 'pt-AO')}</p>
                 </div>
              ) : (
                 maquinas.map((maquina, i) => {
@@ -278,25 +305,19 @@ export function Dashboard({ transacoes, produtos, podeOperar, editarTransacao, t
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.05 }}
-                      className={`${temaEscuro ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-gray-200 shadow-sm'} border p-3 rounded-[1.5rem] flex items-center justify-between group`}
+                      className={`${temaEscuro ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-gray-200 shadow-sm'} border p-2 px-3 rounded-xl flex items-center justify-between group`}
                     >
-                       <div className="flex items-center gap-3">
-                          <div className="bg-orange-500/10 p-2 rounded-xl text-orange-500">
-                             <Monitor size={18} />
+                       <div className="flex items-center gap-2">
+                          <div className="bg-orange-500/10 p-1.5 rounded-lg text-orange-500">
+                             <Monitor size={14} />
                           </div>
                           <div>
-                             <p className="text-xs font-black text-white uppercase">{maquina.nome}</p>
-                             <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">{translate('performance', idioma || 'pt-AO')} {translate('today', idioma || 'pt-AO')}</p>
+                             <p className="text-[10px] font-black text-white uppercase leading-none">{maquina.nome}</p>
+                             <p className="text-[7px] text-gray-500 font-bold uppercase tracking-tight mt-0.5">{translate('today', idioma || 'pt-AO')}</p>
                           </div>
                        </div>
                        <div className="text-right">
-                          <p className="text-sm font-black text-emerald-400">{formatarDinheiro(lucroMaq, moeda)}</p>
-                          <div className="h-1 w-16 bg-gray-800 rounded-full mt-1 overflow-hidden">
-                             <div 
-                               className="h-full bg-emerald-500" 
-                               style={{ width: `${entradasHoje > 0 ? Math.min(100, (lucroMaq / entradasHoje) * 100) : 0}%` }}
-                             ></div>
-                          </div>
+                          <p className="text-xs font-black text-emerald-400">{formatarDinheiro(lucroMaq, moeda)}</p>
                        </div>
                     </motion.div>
                   );
@@ -304,27 +325,48 @@ export function Dashboard({ transacoes, produtos, podeOperar, editarTransacao, t
              )}
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <AnimatePresence mode="popLayout">
-              {transacoesHoje.length === 0 ? (
-                <div className={`text-center py-8 ${temaEscuro ? 'bg-gray-900/30 border-gray-800' : 'bg-gray-50 border-gray-200'} rounded-[2rem] border border-dashed`}>
-                  <Coffee size={30} className="text-gray-700 mx-auto mb-2 opacity-50" />
-                  <p className="text-gray-600 text-[9px] font-black uppercase tracking-widest">...</p>
-                </div>
-              ) : (
-                transacoesHoje.map((t_item, i) => (
-                  <TransacaoItem 
-                    key={t_item.id} 
-                    t={t_item} 
-                    podeOperar={podeOperar} 
-                    editarTransacao={editarTransacao} 
-                    index={i}
-                    temaEscuro={temaEscuro}
-                    moeda={moeda}
-                    idioma={idioma || 'pt-AO'}
-                  />
-                ))
-              )}
+              {(() => {
+                const logsRelevantes = auditoria
+                  .filter(a => a.data === dataHoje && (a.acao === 'VENDA_PRODUTO' || a.acao === 'SAÍDA_STOCK' || a.acao === 'REPOSIÇÃO_STOCK'))
+                  .map(a => ({ ...a, type: 'audit' as const }));
+                
+                const transacoesSimplificadas = transacoesHoje.map(t => ({ ...t, type: 'trans' as const }));
+
+                const todasAtividades = [...transacoesSimplificadas, ...logsRelevantes].sort((a, b) => b.hora.localeCompare(a.hora));
+
+                if (todasAtividades.length === 0) {
+                  return (
+                    <div className={`text-center py-8 ${temaEscuro ? 'bg-gray-900/30 border-gray-800' : 'bg-gray-50 border-gray-200'} rounded-[2rem] border border-dashed`}>
+                      <Coffee size={30} className="text-gray-700 mx-auto mb-2 opacity-50" />
+                      <p className="text-gray-600 text-[9px] font-black uppercase tracking-widest">...</p>
+                    </div>
+                  );
+                }
+
+                return todasAtividades.map((item, i) => (
+                  item.type === 'trans' ? (
+                    <TransacaoItem 
+                      key={item.id} 
+                      t={item as Transacao} 
+                      podeOperar={podeOperar} 
+                      editarTransacao={editarTransacao} 
+                      index={i}
+                      temaEscuro={temaEscuro}
+                      moeda={moeda}
+                      idioma={idioma || 'pt-AO'}
+                    />
+                  ) : (
+                    <AuditoriaItem 
+                      key={item.id}
+                      log={item as AuditoriaLog}
+                      index={i}
+                      temaEscuro={temaEscuro}
+                    />
+                  )
+                ));
+              })()}
             </AnimatePresence>
           </div>
         )} 
