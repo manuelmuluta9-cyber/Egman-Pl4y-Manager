@@ -1,8 +1,23 @@
-import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
+import { Type, FunctionDeclaration } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const HOSTED_URL = "https://egman-play-634970902396.europe-west2.run.app";
 
-// Definitions of functions the AI can call
+const getBaseUrl = () => {
+  const origin = window.location.origin || "";
+  
+  // Detect native mobile containers/webviews (APKs) running locally on phone
+  const isNativeApp = origin.startsWith("file://") || 
+                      origin.startsWith("capacitor://") ||
+                      origin.startsWith("ionic://") ||
+                      (window.location.hostname === "localhost" && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+
+  if (isNativeApp) {
+    return HOSTED_URL;
+  }
+  return "";
+};
+
+// Definitions of functions the AI can call (kept for compatibility/future use)
 export const AI_FUNCTIONS: FunctionDeclaration[] = [
   {
     name: "registarTransacao",
@@ -46,27 +61,20 @@ export const AI_FUNCTIONS: FunctionDeclaration[] = [
 
 export const getSystemIntelligence = async (appState: any) => {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{
-        role: "user",
-        parts: [{
-          text: `
-          Analisa os seguintes dados do sistema EGMAN PLAY e fornece 3 recomendações curtas e diretas em formato JSON.
-          Dados: ${JSON.stringify(appState)}
-          
-          O JSON deve ser um objeto com um array de strings chamado "recomendas".
-          Exemplos de tom: "Sábado é o dia com mais lucro", "A Máquina 3 está a ser pouco rentável", "O Funcionário X é o que faturou mais".
-          `
-        }]
-      }],
-      config: {
-        responseMimeType: "application/json",
-      }
+    const baseUrl = getBaseUrl();
+    const response = await fetch(`${baseUrl}/api/ai/intelligence`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ appState })
     });
-    
-    if (!response.text) return [];
-    const data = JSON.parse(response.text);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
     return data.recomendas || [];
   } catch (error) {
     console.error("AI Intelligence Error:", error);
@@ -76,36 +84,23 @@ export const getSystemIntelligence = async (appState: any) => {
 
 export const chatWithManager = async (message: string, appState: any, history: any[] = []) => {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        ...history.map((h: any) => ({
-          role: h.role === 'user' ? 'user' : 'model',
-          parts: [{ text: h.parts?.[0]?.text || h.text || "" }]
-        })),
-        { role: "user", parts: [{ text: message }] }
-      ],
-      config: {
-        systemInstruction: `
-          És o EGMAN MANAGER IA, o assistente inteligente oficial do sistema EGMAN PLAY.
-          Tens acesso total aos dados (Transações, Máquinas, Funcionários, Sessões).
-          Objetivo: Ajudar o administrador a gerir a empresa, dar insights e EXECUTAR ações através das ferramentas disponíveis.
-          
-          DADOS ATUAIS: ${JSON.stringify(appState)}
-          
-          Regras:
-          1. Se o utilizador pedir para registar algo (ex: "vendi uma coca-cola por 500 em dinheiro"), a resposta deve indicar que estás pronto para ajudar mas como és uma ponte podes sugerir os campos.
-          2. Dá sempre uma resposta textual explicativa curta.
-          3. NÃO USES ASTERISCOS (*) OU FORMATAÇÃO MARKDOWN NO TEXTO. Escreve de forma limpa e natural.
-          4. Sê profissional, direto e focado no crescimento do negócio.
-          5. Podes prever lucros e tendências com base nas transações fornecidas.
-        `,
-      }
+    const baseUrl = getBaseUrl();
+    const response = await fetch(`${baseUrl}/api/ai/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ message, appState, history })
     });
 
-    return { response: { text: () => response.text || "Sem resposta." } };
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return { response: { text: () => data.text || "Sem resposta." } };
   } catch (error) {
     console.error("Chat Error:", error);
-    return { response: { text: () => "Desculpa, ocorreu um erro ao contactar a minha inteligência central. Verifica a ligação." } };
+    return { response: { text: () => "Desculpa, ocorreu um erro ao contactar a minha inteligência central. Verifica a ligação à Internet." } };
   }
 };

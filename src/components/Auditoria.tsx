@@ -74,10 +74,10 @@ export function Auditoria({ logs, temaEscuro, idioma = 'pt-AO', apagarLog, limpa
                 {apagarLog && (
                   <button 
                     onClick={() => handleApagarRow(log.id)}
-                    className="p-1 px-2 text-gray-700 hover:text-red-500 transition-colors border border-transparent hover:border-red-500/20 rounded-lg hover:bg-red-500/5 flex items-center gap-1"
+                    className="p-2.5 px-3 text-red-500/70 hover:text-red-500 transition-all border border-red-500/10 hover:border-red-500/30 rounded-xl bg-red-500/5 hover:bg-red-500/10 flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <Trash2 size={12} />
-                    <span className="text-[8px] font-black uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity">{t('delete', idioma)}</span>
+                    <Trash2 size={14} />
+                    <span className="text-[9px] font-black uppercase tracking-tight">{t('delete', idioma)}</span>
                   </button>
                 )}
               </div>

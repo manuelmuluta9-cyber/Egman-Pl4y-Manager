@@ -307,15 +307,6 @@ export function AdicionarTransacao({ transacaoInicial, onSalvar, onCancelar, con
         </div>
         
         <div className="flex gap-2 pt-2 sticky bottom-2 z-10">
-          {transacaoInicial && (
-            <button 
-              type="button" 
-              onClick={onApagar} 
-              className="p-4 rounded-2xl bg-red-500/5 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all active:scale-95 shadow-xl"
-            >
-              <Trash2 size={20} />
-            </button>
-          )}
           <button 
             type="submit" 
             disabled={!valor || !categoria} 
@@ -323,6 +314,15 @@ export function AdicionarTransacao({ transacaoInicial, onSalvar, onCancelar, con
           >
             {transacaoInicial ? t('save', idioma) : tipo === 'entrada' ? t('register_revenue', idioma) : t('register_expense', idioma)}
           </button>
+          {transacaoInicial && (
+            <button 
+              type="button" 
+              onClick={onApagar} 
+              className="px-6 rounded-2xl bg-red-500/5 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all active:scale-95 shadow-xl"
+            >
+              <Trash2 size={20} />
+            </button>
+          )}
         </div>
       </form>
     </div>

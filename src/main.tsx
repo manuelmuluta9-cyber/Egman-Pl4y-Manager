@@ -5,7 +5,14 @@ import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
 // Register service worker for offline support
-registerSW({ immediate: true });
+registerSW({
+  onOfflineReady() {
+    console.log('App ready to work offline');
+  },
+  onNeedRefresh() {
+    console.log('New content available, please refresh.');
+  }
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

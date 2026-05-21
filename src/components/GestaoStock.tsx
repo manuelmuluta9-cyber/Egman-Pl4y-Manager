@@ -197,10 +197,10 @@ export function GestaoStock({ produtos, transacoes, config, contaNegocio, onBack
                       </div>
                     </div>
                  </div>
-                 <div className="flex gap-1">
-                   <button onClick={() => { setEditando(p); setIsNovo(false); }} className={`p-1 ${temaEscuro ? 'bg-gray-900 border-gray-800 text-gray-500 hover:text-white' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-900 shadow-sm'} rounded-md border shadow-sm`}><Edit3 size={10}/></button>
-                   <button onClick={() => handleDelete(p.id, p.nome)} className="p-1 text-red-500/50 hover:text-red-500 bg-red-500/5 rounded-md border border-red-500/10"><Trash2 size={10}/></button>
-                 </div>
+                   <div className="flex gap-2">
+                     <button onClick={() => { setEditando(p); setIsNovo(false); }} className={`p-2.5 ${temaEscuro ? 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 shadow-sm'} rounded-xl border shadow-sm transition-all active:scale-90`}><Edit3 size={14}/></button>
+                     <button onClick={() => handleDelete(p.id, p.nome)} className="p-2.5 text-red-500/60 hover:text-red-500 bg-red-500/10 rounded-xl border border-red-500/20 transition-all active:scale-95"><Trash2 size={14}/></button>
+                   </div>
                </div>
                <div className="grid grid-cols-3 gap-1.5">
                  <div className={`${temaEscuro ? 'bg-gray-950/80 border-gray-800/50' : 'bg-emerald-50 border-emerald-100'} p-1.5 rounded-lg border flex flex-col justify-center`}>

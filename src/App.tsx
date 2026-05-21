@@ -635,24 +635,24 @@ export default function App() {
   };
 
   const apagarLogAuditoria = async (id: string) => {
-    if (!contaNegocio || !role) return;
+    if (!contaNegocio) return;
     try {
       await deleteDoc(doc(db, `artifacts/${appId}/public/data/auditoria_${contaNegocio}`, id));
     } catch (err) {
       console.error("Erro ao apagar log:", err);
-      mostrarAlerta(t('error_label', config.idioma), t('execution_failed', config.idioma));
+      mostrarAlerta('Erro', 'Não foi possível apagar o log. Verifique sua conexão.');
     }
   };
 
   const apagarVariosLogsAuditoria = async (ids: string[]) => {
-    if (!contaNegocio || !role || ids.length === 0) return;
+    if (!contaNegocio || ids.length === 0) return;
     try {
       const promises = ids.map(id => deleteDoc(doc(db, `artifacts/${appId}/public/data/auditoria_${contaNegocio}`, id)));
       await Promise.all(promises);
       registarAuditoria('LIMPEZA_AUDITORIA', `Apagou ${ids.length} logs de auditoria`);
     } catch (err) {
       console.error("Erro ao apagar logs:", err);
-      mostrarAlerta(t('error_label', config.idioma), t('execution_failed', config.idioma));
+      mostrarAlerta('Erro', 'Não foi possível limpar os logs.');
     }
   };
 
